@@ -5,23 +5,23 @@
 See: .planning/PROJECT.md (updated 2026-01-26)
 
 **Core value:** Complete privacy through local-only processing
-**Current focus:** Phase 4 — State Machine
+**Current focus:** Phase 4 — State Machine (Complete)
 
 ## Current Position
 
-Phase: 4 of 12 (State Machine) — In progress
-Plan: 1/2 complete
-Status: In progress
-Last activity: 2026-01-26 — Completed 04-01-PLAN.md
+Phase: 4 of 12 (State Machine) — Complete
+Plan: 2/2 complete
+Status: Ready for Phase 5
+Last activity: 2026-01-26 — Completed 04-02-PLAN.md
 
-Progress: █████░░░░░ 50%
+Progress: ██████████ 100%
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 7
-- Average duration: 3.1 min
-- Total execution time: 22 min
+- Total plans completed: 8
+- Average duration: 3.0 min
+- Total execution time: 24 min
 
 **By Phase:**
 
@@ -30,11 +30,11 @@ Progress: █████░░░░░ 50%
 | 1-foundation | 2 | 11 min | 5.5 min |
 | 2-audio-infrastructure | 2 | 5 min | 2.5 min |
 | 3-stt-pipeline | 2 | 4 min | 2 min |
-| 4-state-machine | 1 | 2 min | 2 min |
+| 4-state-machine | 2 | 4 min | 2 min |
 
 **Recent Trend:**
-- Last 5 plans: 02-02 (3 min), 03-01 (2 min), 03-02 (2 min), 04-01 (2 min)
-- Trend: Accelerating
+- Last 5 plans: 03-01 (2 min), 03-02 (2 min), 04-01 (2 min), 04-02 (2 min)
+- Trend: Stable at ~2 min per plan
 
 ## Accumulated Context
 
@@ -65,6 +65,8 @@ Recent decisions affecting current work:
 - 100ms minimum audio threshold for transcription (03-02)
 - ConversationState separate from PipelineState (state machine is source of truth) (04-01)
 - asyncio.Lock for thread-safe state transitions (04-01)
+- Barge-in callbacks invoked before transition to allow buffer clearing (04-02)
+- StateChangeEvent.to_dict() for WebRTC data channel broadcast (04-02)
 
 ### Pending Todos
 
@@ -76,6 +78,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-01-26T20:12:09Z
-Stopped at: Completed 04-01-PLAN.md — State machine foundation implemented
+Last session: 2026-01-26T20:17:00Z
+Stopped at: Completed 04-02-PLAN.md — Barge-in and broadcast support added
 Resume file: None
