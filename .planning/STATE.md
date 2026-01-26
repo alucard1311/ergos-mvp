@@ -5,23 +5,23 @@
 See: .planning/PROJECT.md (updated 2026-01-26)
 
 **Core value:** Complete privacy through local-only processing
-**Current focus:** Phase 8 — WebRTC Transport
+**Current focus:** Phase 9 — Flutter Client Core
 
 ## Current Position
 
-Phase: 8 of 12 (WebRTC Transport)
-Plan: 4 of 4 in current phase
+Phase: 9 of 12 (Flutter Client Core)
+Plan: 3 of 3 in current phase
 Status: Phase complete
-Last activity: 2026-01-26 — Completed 08-04-PLAN.md
+Last activity: 2026-01-26 — Completed 09-03-PLAN.md
 
-Progress: ██████████████████ 75%
+Progress: ██████████████████████ 83%
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 17
+- Total plans completed: 20
 - Average duration: 2.4 min
-- Total execution time: 40 min
+- Total execution time: 48 min
 
 **By Phase:**
 
@@ -35,10 +35,11 @@ Progress: ██████████████████ 75%
 | 6-tts-pipeline | 2 | 5 min | 2.5 min |
 | 7-persona-system | 1 | 1 min | 1 min |
 | 8-webrtc-transport | 4 | 6 min | 1.5 min |
+| 9-flutter-client-core | 3 | 8 min | 2.7 min |
 
 **Recent Trend:**
-- Last 5 plans: 08-01 (2 min), 08-02 (1 min), 08-03 (1 min), 08-04 (2 min)
-- Trend: Stable at ~1.5 min per plan
+- Last 5 plans: 08-03 (1 min), 08-04 (2 min), 09-01 (3 min), 09-02 (2 min), 09-03 (3 min)
+- Trend: Flutter plans slightly longer due to SDK setup
 
 ## Accumulated Context
 
@@ -99,6 +100,13 @@ Recent decisions affecting current work:
 - Track added BEFORE createAnswer() per RESEARCH.md pitfall #6 (08-04)
 - Track registry on ConnectionManager for retrieving TTSAudioTrack (08-04)
 - on_incoming_audio callback for routing client audio to STT pipeline (08-04)
+- flutter_webrtc ^0.12.5 for WebRTC (SDK compatibility) (09-01)
+- vad ^0.0.6 for Silero VAD v5 (Dart SDK version requirement) (09-01)
+- minSdkVersion 23 for Android (flutter_webrtc requirement) (09-01)
+- Data channel created BEFORE createOffer (RESEARCH.md pitfall #1) (09-02)
+- Permission handling for microphone with permanentlyDenied → openAppSettings() (09-02)
+- frameSamples: 512 for Silero VAD v5 (32ms frames at 16kHz) (09-03)
+- VAD events flow: speech → VADService → WebRTCService.sendDataChannelMessage() (09-03)
 
 ### Pending Todos
 
@@ -110,6 +118,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-01-26T21:13:58Z
-Stopped at: Completed 08-04-PLAN.md — Phase 8 complete
+Last session: 2026-01-26
+Stopped at: Completed 09-03-PLAN.md — Phase 9 complete
 Resume file: None
