@@ -21,9 +21,9 @@ Requirements for initial release. Each maps to roadmap phases.
 
 ### LLM (Server)
 
-- [ ] **LLM-01**: Server generates responses using Phi-3 Mini (3.8B) via llama-cpp-python
-- [ ] **LLM-02**: Server streams tokens to TTS as they are generated
-- [ ] **LLM-03**: Server manages context/memory within <8GB RAM target
+- [x] **LLM-01**: Server generates responses using Phi-3 Mini (3.8B) via llama-cpp-python
+- [x] **LLM-02**: Server streams tokens to TTS as they are generated
+- [x] **LLM-03**: Server manages context/memory within <8GB RAM target
 
 ### Text-to-Speech (Server)
 
@@ -123,9 +123,9 @@ Which phases cover which requirements. Updated by create-roadmap.
 | STATE-01 | Phase 4 | Complete |
 | STATE-02 | Phase 4 | Complete |
 | STATE-03 | Phase 4 | Complete |
-| LLM-01 | Phase 5 | Pending |
-| LLM-02 | Phase 5 | Pending |
-| LLM-03 | Phase 5 | Pending |
+| LLM-01 | Phase 5 | Complete |
+| LLM-02 | Phase 5 | Complete |
+| LLM-03 | Phase 5 | Complete |
 | TTS-01 | Phase 6 | Pending |
 | TTS-02 | Phase 6 | Pending |
 | TTS-03 | Phase 6 | Pending |
@@ -151,4 +151,4 @@ Which phases cover which requirements. Updated by create-roadmap.
 
 ---
 *Requirements defined: 2026-01-26*
-*Last updated: 2026-01-26 after Phase 4 completion*
+*Last updated: 2026-01-26 after Phase 5 completion*

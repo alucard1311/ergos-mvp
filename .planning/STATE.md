@@ -5,23 +5,23 @@
 See: .planning/PROJECT.md (updated 2026-01-26)
 
 **Core value:** Complete privacy through local-only processing
-**Current focus:** Phase 4 — State Machine (Complete)
+**Current focus:** Phase 5 — LLM Integration (Complete)
 
 ## Current Position
 
-Phase: 4 of 12 (State Machine) — Complete
+Phase: 5 of 12 (LLM Integration) — Complete
 Plan: 2/2 complete
-Status: Ready for Phase 5
-Last activity: 2026-01-26 — Completed 04-02-PLAN.md
+Status: Ready for Phase 6
+Last activity: 2026-01-26 — Completed 05-02-PLAN.md
 
 Progress: ██████████ 100%
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 8
-- Average duration: 3.0 min
-- Total execution time: 24 min
+- Total plans completed: 10
+- Average duration: 2.8 min
+- Total execution time: 28 min
 
 **By Phase:**
 
@@ -31,9 +31,10 @@ Progress: ██████████ 100%
 | 2-audio-infrastructure | 2 | 5 min | 2.5 min |
 | 3-stt-pipeline | 2 | 4 min | 2 min |
 | 4-state-machine | 2 | 4 min | 2 min |
+| 5-llm-integration | 2 | 4 min | 2 min |
 
 **Recent Trend:**
-- Last 5 plans: 03-01 (2 min), 03-02 (2 min), 04-01 (2 min), 04-02 (2 min)
+- Last 5 plans: 04-01 (2 min), 04-02 (2 min), 05-01 (2 min), 05-02 (2 min)
 - Trend: Stable at ~2 min per plan
 
 ## Accumulated Context
@@ -67,6 +68,12 @@ Recent decisions affecting current work:
 - asyncio.Lock for thread-safe state transitions (04-01)
 - Barge-in callbacks invoked before transition to allow buffer clearing (04-02)
 - StateChangeEvent.to_dict() for WebRTC data channel broadcast (04-02)
+- llama-cpp-python with Llama() for Phi-3 Mini GGUF models (05-01)
+- Lazy model loading for LLMGenerator (05-01)
+- n_ctx=2048 context window, n_gpu_layers=-1 for GPU offload (05-01)
+- Phi-3 chat format: <|system|>, <|user|>, <|assistant|> with <|end|> (05-02)
+- Conversation history bounded to 10 messages for memory management (05-02)
+- Token callbacks for streaming to TTS (05-02)
 
 ### Pending Todos
 
@@ -78,6 +85,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-01-26T20:17:00Z
-Stopped at: Completed 04-02-PLAN.md — Barge-in and broadcast support added
+Last session: 2026-01-26T21:00:00Z
+Stopped at: Completed 05-02-PLAN.md — LLM processor with conversation history
 Resume file: None
