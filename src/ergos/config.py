@@ -39,8 +39,25 @@ class TTSConfig(BaseModel):
 
 
 class PersonaConfig(BaseModel):
-    """Persona configuration."""
+    """Persona configuration.
 
+    Supports two modes:
+    1. File-based: Set persona_file to path of persona YAML file
+    2. Inline: Set name and system_prompt directly (fallback if no file)
+
+    Example YAML:
+        persona:
+          persona_file: "~/.ergos/personas/aria.yaml"
+
+        OR
+
+        persona:
+          name: "Ergos"
+          system_prompt: "You are a helpful voice assistant."
+    """
+
+    persona_file: Optional[str] = None  # Path to persona YAML file
+    # Fallback values if no file specified
     name: str = "Ergos"
     system_prompt: str = "You are a helpful voice assistant."
 
