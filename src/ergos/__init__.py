@@ -1,0 +1,3 @@
+"""Ergos - Local-first voice assistant."""
+
+__version__ = "0.1.0"
