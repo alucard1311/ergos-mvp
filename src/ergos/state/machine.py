@@ -66,6 +66,20 @@ class ConversationStateMachine:
         """Current conversation state."""
         return self._state
 
+    @property
+    def stats(self) -> dict:
+        """Get state machine statistics."""
+        return {
+            "current_state": self._state.value,
+            "callback_count": len(self._callbacks),
+            "barge_in_callback_count": len(self._barge_in_callbacks),
+        }
+
+    @property
+    def is_interruptible(self) -> bool:
+        """Whether barge-in is currently possible."""
+        return self._state in (ConversationState.SPEAKING, ConversationState.PROCESSING)
+
     async def transition_to(
         self,
         new_state: ConversationState,

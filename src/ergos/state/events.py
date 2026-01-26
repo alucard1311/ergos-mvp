@@ -35,6 +35,16 @@ class StateChangeEvent:
     def __str__(self) -> str:
         return f"{self.previous_state.value} → {self.new_state.value}"
 
+    def to_dict(self) -> dict:
+        """Serialize for client broadcast (e.g., via data channel)."""
+        return {
+            "type": "state_change",
+            "previous": self.previous_state.value,
+            "state": self.new_state.value,
+            "timestamp": self.timestamp,
+            "metadata": self.metadata or {},
+        }
+
 
 # Type alias for state change callbacks
 StateChangeCallback = Callable[[StateChangeEvent], Awaitable[None]]
