@@ -10,18 +10,18 @@ See: .planning/PROJECT.md (updated 2026-01-26)
 ## Current Position
 
 Phase: 8 of 12 (WebRTC Transport)
-Plan: 1 of 4 in current phase
+Plan: 2 of 4 in current phase
 Status: In progress
-Last activity: 2026-01-26 — Completed 08-01-PLAN.md
+Last activity: 2026-01-26 — Completed 08-02-PLAN.md
 
-Progress: ███████████████ 62%
+Progress: ████████████████ 67%
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 14
-- Average duration: 2.6 min
-- Total execution time: 36 min
+- Total plans completed: 15
+- Average duration: 2.5 min
+- Total execution time: 37 min
 
 **By Phase:**
 
@@ -91,6 +91,9 @@ Recent decisions affecting current work:
 - 24kHz sample rate for TTSAudioTrack to match Kokoro output (08-01)
 - 20ms frame duration (AUDIO_PTIME=0.020) for aiortc standard pacing (08-01)
 - Non-blocking recv() returns silence when no audio available (08-01)
+- ConnectionManager tracks connections in set for auto-cleanup (08-02)
+- Async cleanup on connectionstatechange for failed/closed states (08-02)
+- aiohttp /offer endpoint returns SDP answer synchronously (08-02)
 
 ### Pending Todos
 
@@ -102,6 +105,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-01-26T21:05:56Z
-Stopped at: Completed 08-01-PLAN.md — Transport types and audio track
+Last session: 2026-01-26T21:09:17Z
+Stopped at: Completed 08-02-PLAN.md — Signaling and connection management
 Resume file: None
