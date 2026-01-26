@@ -27,9 +27,9 @@ Requirements for initial release. Each maps to roadmap phases.
 
 ### Text-to-Speech (Server)
 
-- [ ] **TTS-01**: Server synthesizes speech using Kokoro ONNX
-- [ ] **TTS-02**: Server streams audio output as synthesis progresses
-- [ ] **TTS-03**: Server chunks responses at sentence boundaries
+- [x] **TTS-01**: Server synthesizes speech using Kokoro ONNX
+- [x] **TTS-02**: Server streams audio output as synthesis progresses
+- [x] **TTS-03**: Server chunks responses at sentence boundaries
 
 ### State Machine (Server)
 
@@ -126,9 +126,9 @@ Which phases cover which requirements. Updated by create-roadmap.
 | LLM-01 | Phase 5 | Complete |
 | LLM-02 | Phase 5 | Complete |
 | LLM-03 | Phase 5 | Complete |
-| TTS-01 | Phase 6 | Pending |
-| TTS-02 | Phase 6 | Pending |
-| TTS-03 | Phase 6 | Pending |
+| TTS-01 | Phase 6 | Complete |
+| TTS-02 | Phase 6 | Complete |
+| TTS-03 | Phase 6 | Complete |
 | PERSONA-01 | Phase 7 | Pending |
 | PERSONA-02 | Phase 7 | Pending |
 | TRANSPORT-01 | Phase 8 | Pending |
@@ -151,4 +151,4 @@ Which phases cover which requirements. Updated by create-roadmap.
 
 ---
 *Requirements defined: 2026-01-26*
-*Last updated: 2026-01-26 after Phase 5 completion*
+*Last updated: 2026-01-26 after Phase 6 completion*

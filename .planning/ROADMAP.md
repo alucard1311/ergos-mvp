@@ -15,7 +15,7 @@ Ergos is a local-first voice assistant with a Python server (STT, LLM, TTS pipel
 - [x] **Phase 3: STT Pipeline** - Speech-to-text with streaming transcription
 - [x] **Phase 4: State Machine** - Conversation flow orchestration with barge-in
 - [x] **Phase 5: LLM Integration** - Phi-3 Mini with streaming tokens
-- [ ] **Phase 6: TTS Pipeline** - Kokoro ONNX with streaming audio
+- [x] **Phase 6: TTS Pipeline** - Kokoro ONNX with streaming audio
 - [ ] **Phase 7: Persona System** - YAML-configured personality
 - [ ] **Phase 8: WebRTC Transport** - Real-time bidirectional audio
 - [ ] **Phase 9: Flutter Client Core** - Audio capture, playback, VAD, WebRTC
@@ -175,7 +175,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8 →
 | 3. STT Pipeline | 2/2 | Complete | 2026-01-26 |
 | 4. State Machine | 2/2 | Complete | 2026-01-26 |
 | 5. LLM Integration | 2/2 | Complete | 2026-01-26 |
-| 6. TTS Pipeline | 0/TBD | Not started | - |
+| 6. TTS Pipeline | 2/2 | Complete | 2026-01-26 |
 | 7. Persona System | 0/TBD | Not started | - |
 | 8. WebRTC Transport | 0/TBD | Not started | - |
 | 9. Flutter Client Core | 0/TBD | Not started | - |
