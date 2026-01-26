@@ -50,8 +50,8 @@ Requirements for initial release. Each maps to roadmap phases.
 - [ ] **CLI-03**: User can check server status via CLI
 - [ ] **CONFIG-01**: Server loads configuration from YAML
 - [ ] **CONFIG-02**: Server auto-detects hardware (GPU)
-- [ ] **PERSONA-01**: Server loads persona from YAML
-- [ ] **PERSONA-02**: Server generates behavior based on persona
+- [x] **PERSONA-01**: Server loads persona from YAML
+- [x] **PERSONA-02**: Server generates behavior based on persona
 
 ### Flutter Client - Audio
 
@@ -129,8 +129,8 @@ Which phases cover which requirements. Updated by create-roadmap.
 | TTS-01 | Phase 6 | Complete |
 | TTS-02 | Phase 6 | Complete |
 | TTS-03 | Phase 6 | Complete |
-| PERSONA-01 | Phase 7 | Pending |
-| PERSONA-02 | Phase 7 | Pending |
+| PERSONA-01 | Phase 7 | Complete |
+| PERSONA-02 | Phase 7 | Complete |
 | TRANSPORT-01 | Phase 8 | Pending |
 | TRANSPORT-02 | Phase 8 | Pending |
 | TRANSPORT-03 | Phase 8 | Pending |
@@ -151,4 +151,4 @@ Which phases cover which requirements. Updated by create-roadmap.
 
 ---
 *Requirements defined: 2026-01-26*
-*Last updated: 2026-01-26 after Phase 6 completion*
+*Last updated: 2026-01-26 after Phase 7 completion*
