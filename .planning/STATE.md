@@ -5,23 +5,23 @@
 See: .planning/PROJECT.md (updated 2026-01-26)
 
 **Core value:** Complete privacy through local-only processing
-**Current focus:** Phase 7 — Pipeline Integration (Next)
+**Current focus:** Phase 8 — WebRTC Transport (Next)
 
 ## Current Position
 
-Phase: 6 of 12 (TTS Pipeline) — Complete
-Plan: 2/2 complete
-Status: Ready for Phase 7
-Last activity: 2026-01-26 — Completed 06-02-PLAN.md
+Phase: 7 of 12 (Persona System) — Complete
+Plan: 1/1 complete
+Status: Ready for Phase 8
+Last activity: 2026-01-26 — Completed 07-01-PLAN.md
 
-Progress: ██████████ 100%
+Progress: ██████████████ 58%
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 12
-- Average duration: 2.7 min
-- Total execution time: 33 min
+- Total plans completed: 13
+- Average duration: 2.6 min
+- Total execution time: 34 min
 
 **By Phase:**
 
@@ -33,9 +33,10 @@ Progress: ██████████ 100%
 | 4-state-machine | 2 | 4 min | 2 min |
 | 5-llm-integration | 2 | 4 min | 2 min |
 | 6-tts-pipeline | 2 | 5 min | 2.5 min |
+| 7-persona-system | 1 | 1 min | 1 min |
 
 **Recent Trend:**
-- Last 5 plans: 05-01 (2 min), 05-02 (2 min), 06-01 (3 min), 06-02 (2 min)
+- Last 5 plans: 05-02 (2 min), 06-01 (3 min), 06-02 (2 min), 07-01 (1 min)
 - Trend: Stable at ~2-3 min per plan
 
 ## Accumulated Context
@@ -83,6 +84,9 @@ Recent decisions affecting current work:
 - receive_token() designed as LLMProcessor token callback (06-02)
 - Buffer cleared synchronously for immediate barge-in response (06-02)
 - flush() called after LLM generation to synthesize remaining text (06-02)
+- Persona uses dataclass with system_prompt property for dynamic prompt generation (07-01)
+- load_persona() returns DEFAULT_PERSONA on file not found or parse error (07-01)
+- PersonaConfig.persona_file supports both file-based and inline persona definition (07-01)
 
 ### Pending Todos
 
@@ -94,6 +98,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-01-26T22:12:00Z
-Stopped at: Completed 06-02-PLAN.md — TTS processor with sentence chunking
+Last session: 2026-01-26T20:48:51Z
+Stopped at: Completed 07-01-PLAN.md — Persona types and loader
 Resume file: None
