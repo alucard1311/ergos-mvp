@@ -10,18 +10,18 @@ See: .planning/PROJECT.md (updated 2026-01-26)
 ## Current Position
 
 Phase: 3 of 12 (STT Pipeline)
-Plan: 0/TBD complete
-Status: Ready to plan
-Last activity: 2026-01-26 — Phase 2 (Audio Infrastructure) complete, verified
+Plan: 1/TBD complete
+Status: In progress
+Last activity: 2026-01-26 — Completed 03-01-PLAN.md
 
-Progress: ███░░░░░░░ 29%
+Progress: ████░░░░░░ 36%
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 4
+- Total plans completed: 5
 - Average duration: 4 min
-- Total execution time: 16 min
+- Total execution time: 18 min
 
 **By Phase:**
 
@@ -29,9 +29,10 @@ Progress: ███░░░░░░░ 29%
 |-------|-------|-------|----------|
 | 1-foundation | 2 | 11 min | 5.5 min |
 | 2-audio-infrastructure | 2 | 5 min | 2.5 min |
+| 3-stt-pipeline | 1 | 2 min | 2 min |
 
 **Recent Trend:**
-- Last 5 plans: 01-01 (5 min), 01-02 (6 min), 02-01 (2 min), 02-02 (3 min)
+- Last 5 plans: 01-02 (6 min), 02-01 (2 min), 02-02 (3 min), 03-01 (2 min)
 - Trend: Accelerating
 
 ## Accumulated Context
@@ -55,6 +56,9 @@ Recent decisions affecting current work:
 - VAD runs on client, server receives events via data channel (02-02)
 - Async callbacks for non-blocking VAD/audio notification (02-02)
 - PipelineState enum matching state machine phases (02-02)
+- Lazy model loading for deferred Whisper initialization (03-01)
+- Word timestamps enabled for fine-grained transcription segments (03-01)
+- Audio normalized to float32 [-1, 1] for faster-whisper (03-01)
 
 ### Pending Todos
 
@@ -66,6 +70,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-01-26T19:40:00Z
-Stopped at: Phase 2 complete, verified — Ready for Phase 3
+Last session: 2026-01-26T19:42:04Z
+Stopped at: Completed 03-01-PLAN.md — STT foundation ready
 Resume file: None
