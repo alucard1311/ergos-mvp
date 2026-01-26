@@ -109,46 +109,46 @@ Which phases cover which requirements. Updated by create-roadmap.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| AUDIO-01 | TBD | Pending |
-| AUDIO-02 | TBD | Pending |
-| AUDIO-03 | TBD | Pending |
-| STT-01 | TBD | Pending |
-| STT-02 | TBD | Pending |
-| STT-03 | TBD | Pending |
-| LLM-01 | TBD | Pending |
-| LLM-02 | TBD | Pending |
-| LLM-03 | TBD | Pending |
-| TTS-01 | TBD | Pending |
-| TTS-02 | TBD | Pending |
-| TTS-03 | TBD | Pending |
-| STATE-01 | TBD | Pending |
-| STATE-02 | TBD | Pending |
-| STATE-03 | TBD | Pending |
-| TRANSPORT-01 | TBD | Pending |
-| TRANSPORT-02 | TBD | Pending |
-| TRANSPORT-03 | TBD | Pending |
-| CLI-01 | TBD | Pending |
-| CLI-02 | TBD | Pending |
-| CLI-03 | TBD | Pending |
-| CONFIG-01 | TBD | Pending |
-| CONFIG-02 | TBD | Pending |
-| PERSONA-01 | TBD | Pending |
-| PERSONA-02 | TBD | Pending |
-| CLIENT-AUDIO-01 | TBD | Pending |
-| CLIENT-AUDIO-02 | TBD | Pending |
-| CLIENT-AUDIO-03 | TBD | Pending |
-| CLIENT-AUDIO-04 | TBD | Pending |
-| CLIENT-UI-01 | TBD | Pending |
-| CLIENT-UI-02 | TBD | Pending |
-| CLIENT-UI-03 | TBD | Pending |
-| CLIENT-PLATFORM-01 | TBD | Pending |
-| CLIENT-PLATFORM-02 | TBD | Pending |
+| CLI-01 | Phase 1 | Pending |
+| CLI-02 | Phase 1 | Pending |
+| CLI-03 | Phase 1 | Pending |
+| CONFIG-01 | Phase 1 | Pending |
+| CONFIG-02 | Phase 1 | Pending |
+| AUDIO-01 | Phase 2 | Pending |
+| AUDIO-02 | Phase 2 | Pending |
+| AUDIO-03 | Phase 2 | Pending |
+| STT-01 | Phase 3 | Pending |
+| STT-02 | Phase 3 | Pending |
+| STT-03 | Phase 3 | Pending |
+| STATE-01 | Phase 4 | Pending |
+| STATE-02 | Phase 4 | Pending |
+| STATE-03 | Phase 4 | Pending |
+| LLM-01 | Phase 5 | Pending |
+| LLM-02 | Phase 5 | Pending |
+| LLM-03 | Phase 5 | Pending |
+| TTS-01 | Phase 6 | Pending |
+| TTS-02 | Phase 6 | Pending |
+| TTS-03 | Phase 6 | Pending |
+| PERSONA-01 | Phase 7 | Pending |
+| PERSONA-02 | Phase 7 | Pending |
+| TRANSPORT-01 | Phase 8 | Pending |
+| TRANSPORT-02 | Phase 8 | Pending |
+| TRANSPORT-03 | Phase 8 | Pending |
+| CLIENT-AUDIO-01 | Phase 9 | Pending |
+| CLIENT-AUDIO-02 | Phase 9 | Pending |
+| CLIENT-AUDIO-03 | Phase 9 | Pending |
+| CLIENT-AUDIO-04 | Phase 9 | Pending |
+| CLIENT-UI-01 | Phase 10 | Pending |
+| CLIENT-UI-02 | Phase 10 | Pending |
+| CLIENT-UI-03 | Phase 10 | Pending |
+| CLIENT-PLATFORM-01 | Phase 11 | Pending |
+| CLIENT-PLATFORM-02 | Phase 11 | Pending |
 
 **Coverage:**
 - v1 requirements: 34 total
-- Mapped to phases: 0
-- Unmapped: 34 ⚠️
+- Mapped to phases: 34
+- Unmapped: 0 ✓
 
 ---
 *Requirements defined: 2026-01-26*
-*Last updated: 2026-01-26 after initial definition*
+*Last updated: 2026-01-26 after roadmap creation*
