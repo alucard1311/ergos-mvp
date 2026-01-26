@@ -173,7 +173,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8 →
 | 1. Foundation | 2/2 | Complete | 2026-01-26 |
 | 2. Audio Infrastructure | 2/2 | Complete | 2026-01-26 |
 | 3. STT Pipeline | 2/2 | Complete | 2026-01-26 |
-| 4. State Machine | 0/TBD | Not started | - |
+| 4. State Machine | 1/2 | In progress | - |
 | 5. LLM Integration | 0/TBD | Not started | - |
 | 6. TTS Pipeline | 0/TBD | Not started | - |
 | 7. Persona System | 0/TBD | Not started | - |

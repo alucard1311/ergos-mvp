@@ -9,19 +9,19 @@ See: .planning/PROJECT.md (updated 2026-01-26)
 
 ## Current Position
 
-Phase: 3 of 12 (STT Pipeline) — Complete
-Plan: 2/2 complete
-Status: Phase complete
-Last activity: 2026-01-26 — Completed 03-02-PLAN.md
+Phase: 4 of 12 (State Machine) — In progress
+Plan: 1/2 complete
+Status: In progress
+Last activity: 2026-01-26 — Completed 04-01-PLAN.md
 
-Progress: █████░░░░░ 43%
+Progress: █████░░░░░ 50%
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 6
-- Average duration: 3.5 min
-- Total execution time: 20 min
+- Total plans completed: 7
+- Average duration: 3.1 min
+- Total execution time: 22 min
 
 **By Phase:**
 
@@ -30,9 +30,10 @@ Progress: █████░░░░░ 43%
 | 1-foundation | 2 | 11 min | 5.5 min |
 | 2-audio-infrastructure | 2 | 5 min | 2.5 min |
 | 3-stt-pipeline | 2 | 4 min | 2 min |
+| 4-state-machine | 1 | 2 min | 2 min |
 
 **Recent Trend:**
-- Last 5 plans: 02-01 (2 min), 02-02 (3 min), 03-01 (2 min), 03-02 (2 min)
+- Last 5 plans: 02-02 (3 min), 03-01 (2 min), 03-02 (2 min), 04-01 (2 min)
 - Trend: Accelerating
 
 ## Accumulated Context
@@ -62,6 +63,8 @@ Recent decisions affecting current work:
 - Speech-bounded transcription via VAD events (03-02)
 - Thread pool executor for transcription to not block event loop (03-02)
 - 100ms minimum audio threshold for transcription (03-02)
+- ConversationState separate from PipelineState (state machine is source of truth) (04-01)
+- asyncio.Lock for thread-safe state transitions (04-01)
 
 ### Pending Todos
 
@@ -73,6 +76,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-01-26T20:02:00Z
-Stopped at: Completed 03-02-PLAN.md — Phase 3 STT Pipeline complete
+Last session: 2026-01-26T20:12:09Z
+Stopped at: Completed 04-01-PLAN.md — State machine foundation implemented
 Resume file: None
