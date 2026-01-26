@@ -133,3 +133,27 @@ class TTSProcessor:
         """
         if callback in self._audio_callbacks:
             self._audio_callbacks.remove(callback)
+
+    # Stats and monitoring
+
+    @property
+    def stats(self) -> dict:
+        """Get processor statistics.
+
+        Returns:
+            Dictionary with processor state information.
+        """
+        return {
+            "buffer_length": len(self._buffer),
+            "audio_callbacks": len(self._audio_callbacks),
+            "model_loaded": self.synthesizer.model_loaded,
+        }
+
+    @property
+    def buffer(self) -> str:
+        """Get current text buffer (read-only).
+
+        Returns:
+            The current buffered text awaiting synthesis.
+        """
+        return self._buffer
