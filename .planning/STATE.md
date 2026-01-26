@@ -5,23 +5,23 @@
 See: .planning/PROJECT.md (updated 2026-01-26)
 
 **Core value:** Complete privacy through local-only processing
-**Current focus:** Phase 6 — TTS Pipeline (In Progress)
+**Current focus:** Phase 7 — Pipeline Integration (Next)
 
 ## Current Position
 
-Phase: 6 of 12 (TTS Pipeline) — In Progress
-Plan: 1/2 complete
-Status: Ready for 06-02
-Last activity: 2026-01-26 — Completed 06-01-PLAN.md
+Phase: 6 of 12 (TTS Pipeline) — Complete
+Plan: 2/2 complete
+Status: Ready for Phase 7
+Last activity: 2026-01-26 — Completed 06-02-PLAN.md
 
-Progress: █████░░░░░ 50%
+Progress: ██████████ 100%
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 11
-- Average duration: 2.8 min
-- Total execution time: 31 min
+- Total plans completed: 12
+- Average duration: 2.7 min
+- Total execution time: 33 min
 
 **By Phase:**
 
@@ -32,10 +32,10 @@ Progress: █████░░░░░ 50%
 | 3-stt-pipeline | 2 | 4 min | 2 min |
 | 4-state-machine | 2 | 4 min | 2 min |
 | 5-llm-integration | 2 | 4 min | 2 min |
-| 6-tts-pipeline | 1 | 3 min | 3 min |
+| 6-tts-pipeline | 2 | 5 min | 2.5 min |
 
 **Recent Trend:**
-- Last 5 plans: 04-02 (2 min), 05-01 (2 min), 05-02 (2 min), 06-01 (3 min)
+- Last 5 plans: 05-01 (2 min), 05-02 (2 min), 06-01 (3 min), 06-02 (2 min)
 - Trend: Stable at ~2-3 min per plan
 
 ## Accumulated Context
@@ -79,6 +79,10 @@ Recent decisions affecting current work:
 - Lazy model loading for TTSSynthesizer (06-01)
 - Sample rate fixed at 24000 Hz (Kokoro output) (06-01)
 - AudioCallback type for streaming audio chunks (06-01)
+- Sentence boundaries detected by .!? followed by space or end of buffer (06-02)
+- receive_token() designed as LLMProcessor token callback (06-02)
+- Buffer cleared synchronously for immediate barge-in response (06-02)
+- flush() called after LLM generation to synthesize remaining text (06-02)
 
 ### Pending Todos
 
@@ -90,6 +94,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-01-26T22:03:00Z
-Stopped at: Completed 06-01-PLAN.md — TTS types and synthesizer wrapper
+Last session: 2026-01-26T22:12:00Z
+Stopped at: Completed 06-02-PLAN.md — TTS processor with sentence chunking
 Resume file: None
