@@ -4,9 +4,12 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from typing import Set
+from typing import TYPE_CHECKING, Dict, Optional, Set
 
 from aiortc import RTCPeerConnection
+
+if TYPE_CHECKING:
+    from ergos.transport.audio_track import TTSAudioTrack
 
 logger = logging.getLogger(__name__)
 
@@ -27,6 +30,7 @@ class ConnectionManager:
         """Initialize the connection manager."""
         self._connections: Set[RTCPeerConnection] = set()
         self._data_channels: Set = set()
+        self._tracks: Dict[RTCPeerConnection, "TTSAudioTrack"] = {}
 
     async def create_connection(self) -> RTCPeerConnection:
         """
@@ -47,10 +51,36 @@ class ConnectionManager:
             logger.debug(f"Connection state changed to: {state}")
             if state in ("failed", "closed"):
                 self._connections.discard(pc)
+                self._tracks.pop(pc, None)
                 logger.info(f"Connection removed from tracking (state: {state})")
 
         logger.info("Created new RTCPeerConnection")
         return pc
+
+    def register_track(self, pc: RTCPeerConnection, track: "TTSAudioTrack") -> None:
+        """
+        Register a TTS audio track for a peer connection.
+
+        This allows retrieving the track later to push TTS audio samples.
+
+        Args:
+            pc: The peer connection.
+            track: The TTSAudioTrack associated with this connection.
+        """
+        self._tracks[pc] = track
+        logger.debug(f"Registered TTS track for connection")
+
+    def get_track(self, pc: RTCPeerConnection) -> Optional["TTSAudioTrack"]:
+        """
+        Get the TTS audio track for a peer connection.
+
+        Args:
+            pc: The peer connection.
+
+        Returns:
+            The TTSAudioTrack for this connection, or None if not found.
+        """
+        return self._tracks.get(pc)
 
     def track_data_channel(self, channel) -> None:
         """
@@ -111,6 +141,7 @@ class ConnectionManager:
         # Clear tracking sets
         self._connections.clear()
         self._data_channels.clear()
+        self._tracks.clear()
         logger.info("All connections closed")
 
     @property
