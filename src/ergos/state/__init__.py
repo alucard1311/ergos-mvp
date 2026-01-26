@@ -5,11 +5,15 @@ from ergos.state.events import (
     StateChangeEvent,
     StateChangeCallback,
 )
-from ergos.state.machine import ConversationStateMachine
+from ergos.state.machine import (
+    ConversationStateMachine,
+    BargeInCallback,
+)
 
 __all__ = [
     "ConversationState",
     "StateChangeEvent",
     "StateChangeCallback",
+    "BargeInCallback",
     "ConversationStateMachine",
 ]
