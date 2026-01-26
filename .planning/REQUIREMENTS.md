@@ -114,9 +114,9 @@ Which phases cover which requirements. Updated by create-roadmap.
 | CLI-03 | Phase 1 | Complete |
 | CONFIG-01 | Phase 1 | Complete |
 | CONFIG-02 | Phase 1 | Complete |
-| AUDIO-01 | Phase 2 | Pending |
-| AUDIO-02 | Phase 2 | Pending |
-| AUDIO-03 | Phase 2 | Pending |
+| AUDIO-01 | Phase 2 | Complete |
+| AUDIO-02 | Phase 2 | Complete |
+| AUDIO-03 | Phase 2 | Complete |
 | STT-01 | Phase 3 | Pending |
 | STT-02 | Phase 3 | Pending |
 | STT-03 | Phase 3 | Pending |
@@ -151,4 +151,4 @@ Which phases cover which requirements. Updated by create-roadmap.
 
 ---
 *Requirements defined: 2026-01-26*
-*Last updated: 2026-01-26 after Phase 1 completion*
+*Last updated: 2026-01-26 after Phase 2 completion*
