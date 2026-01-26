@@ -2,13 +2,16 @@
 
 import asyncio
 import logging
-from typing import Optional
+from typing import Optional, Callable, Awaitable
 
 from ergos.state.events import (
     ConversationState,
     StateChangeEvent,
     StateChangeCallback,
 )
+
+# Type alias for barge-in callbacks (e.g., clear TTS buffer)
+BargeInCallback = Callable[[], Awaitable[None]]
 
 logger = logging.getLogger(__name__)
 
@@ -55,6 +58,7 @@ class ConversationStateMachine:
     def __init__(self):
         self._state = ConversationState.IDLE
         self._callbacks: list[StateChangeCallback] = []
+        self._barge_in_callbacks: list[BargeInCallback] = []
         self._transition_lock = asyncio.Lock()
 
     @property
@@ -159,3 +163,50 @@ class ConversationStateMachine:
                     metadata={"reason": "reset"},
                 )
                 await self._notify_callbacks(event)
+
+    # Barge-in support
+
+    async def barge_in(self) -> bool:
+        """
+        Handle barge-in (user interrupting AI).
+
+        - If SPEAKING: clears buffers, transitions to LISTENING
+        - If PROCESSING: transitions to LISTENING
+        - Otherwise: no-op, returns False
+
+        Returns True if barge-in was executed.
+        """
+        if self._state == ConversationState.SPEAKING:
+            # First invoke barge-in callbacks to clear buffers
+            for callback in self._barge_in_callbacks:
+                try:
+                    await callback()
+                except Exception as e:
+                    logger.error(f"Barge-in callback error: {e}")
+
+            # Then transition to LISTENING
+            await self.transition_to(
+                ConversationState.LISTENING,
+                metadata={"trigger": "barge_in"}
+            )
+            logger.info("Barge-in: interrupted speaking, now listening")
+            return True
+
+        elif self._state == ConversationState.PROCESSING:
+            await self.transition_to(
+                ConversationState.LISTENING,
+                metadata={"trigger": "barge_in"}
+            )
+            logger.info("Barge-in: interrupted processing, now listening")
+            return True
+
+        return False
+
+    def add_barge_in_callback(self, callback: BargeInCallback) -> None:
+        """Register callback to be invoked on barge-in (e.g., clear TTS buffer)."""
+        self._barge_in_callbacks.append(callback)
+
+    def remove_barge_in_callback(self, callback: BargeInCallback) -> None:
+        """Remove a barge-in callback."""
+        if callback in self._barge_in_callbacks:
+            self._barge_in_callbacks.remove(callback)
