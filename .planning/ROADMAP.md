@@ -171,7 +171,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8 →
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. Foundation | 2/2 | Complete | 2026-01-26 |
-| 2. Audio Infrastructure | 0/TBD | Not started | - |
+| 2. Audio Infrastructure | 1/2 | In progress | - |
 | 3. STT Pipeline | 0/TBD | Not started | - |
 | 4. State Machine | 0/TBD | Not started | - |
 | 5. LLM Integration | 0/TBD | Not started | - |
