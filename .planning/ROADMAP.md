@@ -177,7 +177,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8 →
 | 5. LLM Integration | 2/2 | Complete | 2026-01-26 |
 | 6. TTS Pipeline | 2/2 | Complete | 2026-01-26 |
 | 7. Persona System | 1/1 | Complete | 2026-01-26 |
-| 8. WebRTC Transport | 2/4 | In progress | - |
+| 8. WebRTC Transport | 3/4 | In progress | - |
 | 9. Flutter Client Core | 0/TBD | Not started | - |
 | 10. Flutter Client UI | 0/TBD | Not started | - |
 | 11. Flutter Client Platform | 0/TBD | Not started | - |
