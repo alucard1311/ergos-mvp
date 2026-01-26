@@ -15,9 +15,9 @@ Requirements for initial release. Each maps to roadmap phases.
 
 ### Speech-to-Text (Server)
 
-- [ ] **STT-01**: Server transcribes speech to text using faster-whisper
-- [ ] **STT-02**: Server streams partial transcriptions as speech is recognized
-- [ ] **STT-03**: Server uses VAD boundaries for transcription segments
+- [x] **STT-01**: Server transcribes speech to text using faster-whisper
+- [x] **STT-02**: Server streams partial transcriptions as speech is recognized
+- [x] **STT-03**: Server uses VAD boundaries for transcription segments
 
 ### LLM (Server)
 
@@ -117,9 +117,9 @@ Which phases cover which requirements. Updated by create-roadmap.
 | AUDIO-01 | Phase 2 | Complete |
 | AUDIO-02 | Phase 2 | Complete |
 | AUDIO-03 | Phase 2 | Complete |
-| STT-01 | Phase 3 | Pending |
-| STT-02 | Phase 3 | Pending |
-| STT-03 | Phase 3 | Pending |
+| STT-01 | Phase 3 | Complete |
+| STT-02 | Phase 3 | Complete |
+| STT-03 | Phase 3 | Complete |
 | STATE-01 | Phase 4 | Pending |
 | STATE-02 | Phase 4 | Pending |
 | STATE-03 | Phase 4 | Pending |
@@ -151,4 +151,4 @@ Which phases cover which requirements. Updated by create-roadmap.
 
 ---
 *Requirements defined: 2026-01-26*
-*Last updated: 2026-01-26 after Phase 2 completion*
+*Last updated: 2026-01-26 after Phase 3 completion*
