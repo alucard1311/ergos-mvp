@@ -5,23 +5,23 @@
 See: .planning/PROJECT.md (updated 2026-01-26)
 
 **Core value:** Complete privacy through local-only processing
-**Current focus:** Phase 8 — WebRTC Transport (Next)
+**Current focus:** Phase 8 — WebRTC Transport
 
 ## Current Position
 
-Phase: 7 of 12 (Persona System) — Complete
-Plan: 1/1 complete
-Status: Ready for Phase 8
-Last activity: 2026-01-26 — Completed 07-01-PLAN.md
+Phase: 8 of 12 (WebRTC Transport)
+Plan: 1 of 4 in current phase
+Status: In progress
+Last activity: 2026-01-26 — Completed 08-01-PLAN.md
 
-Progress: ██████████████ 58%
+Progress: ███████████████ 62%
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 13
+- Total plans completed: 14
 - Average duration: 2.6 min
-- Total execution time: 34 min
+- Total execution time: 36 min
 
 **By Phase:**
 
@@ -34,10 +34,11 @@ Progress: ██████████████ 58%
 | 5-llm-integration | 2 | 4 min | 2 min |
 | 6-tts-pipeline | 2 | 5 min | 2.5 min |
 | 7-persona-system | 1 | 1 min | 1 min |
+| 8-webrtc-transport | 1 | 2 min | 2 min |
 
 **Recent Trend:**
-- Last 5 plans: 05-02 (2 min), 06-01 (3 min), 06-02 (2 min), 07-01 (1 min)
-- Trend: Stable at ~2-3 min per plan
+- Last 5 plans: 06-01 (3 min), 06-02 (2 min), 07-01 (1 min), 08-01 (2 min)
+- Trend: Stable at ~2 min per plan
 
 ## Accumulated Context
 
@@ -87,6 +88,9 @@ Recent decisions affecting current work:
 - Persona uses dataclass with system_prompt property for dynamic prompt generation (07-01)
 - load_persona() returns DEFAULT_PERSONA on file not found or parse error (07-01)
 - PersonaConfig.persona_file supports both file-based and inline persona definition (07-01)
+- 24kHz sample rate for TTSAudioTrack to match Kokoro output (08-01)
+- 20ms frame duration (AUDIO_PTIME=0.020) for aiortc standard pacing (08-01)
+- Non-blocking recv() returns silence when no audio available (08-01)
 
 ### Pending Todos
 
@@ -98,6 +102,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-01-26T20:48:51Z
-Stopped at: Completed 07-01-PLAN.md — Persona types and loader
+Last session: 2026-01-26T21:05:56Z
+Stopped at: Completed 08-01-PLAN.md — Transport types and audio track
 Resume file: None
