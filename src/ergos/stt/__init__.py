@@ -1,5 +1,6 @@
 """Speech-to-text (STT) package for Ergos voice assistant."""
 
+from ergos.stt.transcriber import WhisperTranscriber
 from ergos.stt.types import (
     TranscriptionCallback,
     TranscriptionResult,
@@ -10,4 +11,5 @@ __all__ = [
     "TranscriptionSegment",
     "TranscriptionResult",
     "TranscriptionCallback",
+    "WhisperTranscriber",
 ]
