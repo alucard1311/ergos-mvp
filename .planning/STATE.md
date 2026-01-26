@@ -10,18 +10,18 @@ See: .planning/PROJECT.md (updated 2026-01-26)
 ## Current Position
 
 Phase: 8 of 12 (WebRTC Transport)
-Plan: 3 of 4 in current phase
-Status: In progress
-Last activity: 2026-01-26 — Completed 08-03-PLAN.md
+Plan: 4 of 4 in current phase
+Status: Phase complete
+Last activity: 2026-01-26 — Completed 08-04-PLAN.md
 
-Progress: █████████████████ 71%
+Progress: ██████████████████ 75%
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 16
+- Total plans completed: 17
 - Average duration: 2.4 min
-- Total execution time: 38 min
+- Total execution time: 40 min
 
 **By Phase:**
 
@@ -34,11 +34,11 @@ Progress: █████████████████ 71%
 | 5-llm-integration | 2 | 4 min | 2 min |
 | 6-tts-pipeline | 2 | 5 min | 2.5 min |
 | 7-persona-system | 1 | 1 min | 1 min |
-| 8-webrtc-transport | 3 | 4 min | 1.3 min |
+| 8-webrtc-transport | 4 | 6 min | 1.5 min |
 
 **Recent Trend:**
-- Last 5 plans: 07-01 (1 min), 08-01 (2 min), 08-02 (1 min), 08-03 (1 min)
-- Trend: Stable at ~1.3 min per plan
+- Last 5 plans: 08-01 (2 min), 08-02 (1 min), 08-03 (1 min), 08-04 (2 min)
+- Trend: Stable at ~1.5 min per plan
 
 ## Accumulated Context
 
@@ -96,6 +96,9 @@ Recent decisions affecting current work:
 - aiohttp /offer endpoint returns SDP answer synchronously (08-02)
 - Data channel message routing by type field: vad_event, barge_in (08-03)
 - get_state_callback() for state machine registration pattern (08-03)
+- Track added BEFORE createAnswer() per RESEARCH.md pitfall #6 (08-04)
+- Track registry on ConnectionManager for retrieving TTSAudioTrack (08-04)
+- on_incoming_audio callback for routing client audio to STT pipeline (08-04)
 
 ### Pending Todos
 
@@ -107,6 +110,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-01-26T21:08:51Z
-Stopped at: Completed 08-03-PLAN.md — Data channel handler
+Last session: 2026-01-26T21:13:58Z
+Stopped at: Completed 08-04-PLAN.md — Phase 8 complete
 Resume file: None
