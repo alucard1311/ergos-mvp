@@ -5,23 +5,23 @@
 See: .planning/PROJECT.md (updated 2026-01-26)
 
 **Core value:** Complete privacy through local-only processing
-**Current focus:** Phase 5 — LLM Integration (Complete)
+**Current focus:** Phase 6 — TTS Pipeline (In Progress)
 
 ## Current Position
 
-Phase: 5 of 12 (LLM Integration) — Complete
-Plan: 2/2 complete
-Status: Ready for Phase 6
-Last activity: 2026-01-26 — Completed 05-02-PLAN.md
+Phase: 6 of 12 (TTS Pipeline) — In Progress
+Plan: 1/2 complete
+Status: Ready for 06-02
+Last activity: 2026-01-26 — Completed 06-01-PLAN.md
 
-Progress: ██████████ 100%
+Progress: █████░░░░░ 50%
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 10
+- Total plans completed: 11
 - Average duration: 2.8 min
-- Total execution time: 28 min
+- Total execution time: 31 min
 
 **By Phase:**
 
@@ -32,10 +32,11 @@ Progress: ██████████ 100%
 | 3-stt-pipeline | 2 | 4 min | 2 min |
 | 4-state-machine | 2 | 4 min | 2 min |
 | 5-llm-integration | 2 | 4 min | 2 min |
+| 6-tts-pipeline | 1 | 3 min | 3 min |
 
 **Recent Trend:**
-- Last 5 plans: 04-01 (2 min), 04-02 (2 min), 05-01 (2 min), 05-02 (2 min)
-- Trend: Stable at ~2 min per plan
+- Last 5 plans: 04-02 (2 min), 05-01 (2 min), 05-02 (2 min), 06-01 (3 min)
+- Trend: Stable at ~2-3 min per plan
 
 ## Accumulated Context
 
@@ -74,6 +75,10 @@ Recent decisions affecting current work:
 - Phi-3 chat format: <|system|>, <|user|>, <|assistant|> with <|end|> (05-02)
 - Conversation history bounded to 10 messages for memory management (05-02)
 - Token callbacks for streaming to TTS (05-02)
+- kokoro-onnx for TTS with natively async create_stream() (06-01)
+- Lazy model loading for TTSSynthesizer (06-01)
+- Sample rate fixed at 24000 Hz (Kokoro output) (06-01)
+- AudioCallback type for streaming audio chunks (06-01)
 
 ### Pending Todos
 
@@ -85,6 +90,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-01-26T21:00:00Z
-Stopped at: Completed 05-02-PLAN.md — LLM processor with conversation history
+Last session: 2026-01-26T22:03:00Z
+Stopped at: Completed 06-01-PLAN.md — TTS types and synthesizer wrapper
 Resume file: None
