@@ -5,33 +5,33 @@
 See: .planning/PROJECT.md (updated 2026-01-26)
 
 **Core value:** Complete privacy through local-only processing
-**Current focus:** Phase 1 — Foundation
+**Current focus:** Phase 1 — Foundation (COMPLETE)
 
 ## Current Position
 
-Phase: 1 of 12 (Foundation)
-Plan: 1 of 2 in current phase
-Status: In progress
-Last activity: 2026-01-26 — Completed 01-01-PLAN.md
+Phase: 1 of 12 (Foundation) — COMPLETE
+Plan: 2 of 2 in current phase — COMPLETE
+Status: Ready for Phase 2
+Last activity: 2026-01-26 — Completed 01-02-PLAN.md (CLI Commands and Server Lifecycle)
 
-Progress: █░░░░░░░░░ 8%
+Progress: ██░░░░░░░░ 16%
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 1
-- Average duration: 5 min
-- Total execution time: 5 min
+- Total plans completed: 2
+- Average duration: 5.5 min
+- Total execution time: 11 min
 
 **By Phase:**
 
 | Phase | Plans | Total | Avg/Plan |
 |-------|-------|-------|----------|
-| 1-foundation | 1 | 5 min | 5 min |
+| 1-foundation | 2 | 11 min | 5.5 min |
 
 **Recent Trend:**
-- Last 5 plans: 01-01 (5 min)
-- Trend: Starting
+- Last 5 plans: 01-01 (5 min), 01-02 (6 min)
+- Trend: Consistent
 
 ## Accumulated Context
 
@@ -46,6 +46,9 @@ Recent decisions affecting current work:
 - Development tooling: mobile-mcp server for Flutter development assistance
 - Package layout: src/ layout for Python package (01-01)
 - Config validation: Pydantic v2 with YAML loading (01-01)
+- PID file at ~/.ergos/server.pid for server tracking (01-02)
+- asyncio.Event for shutdown coordination (01-02)
+- Signal handlers for SIGINT and SIGTERM (01-02)
 
 ### Pending Todos
 
@@ -57,6 +60,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-01-26T18:42:00Z
-Stopped at: Completed 01-01-PLAN.md (Project Infrastructure)
+Last session: 2026-01-26T18:49:00Z
+Stopped at: Completed 01-02-PLAN.md (CLI Commands and Server Lifecycle)
 Resume file: None
