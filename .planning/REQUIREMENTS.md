@@ -33,9 +33,9 @@ Requirements for initial release. Each maps to roadmap phases.
 
 ### State Machine (Server)
 
-- [ ] **STATE-01**: Server implements IDLE → LISTENING → PROCESSING → SPEAKING state machine
-- [ ] **STATE-02**: Server broadcasts state changes to client
-- [ ] **STATE-03**: Server handles barge-in (stops TTS, clears buffers)
+- [x] **STATE-01**: Server implements IDLE → LISTENING → PROCESSING → SPEAKING state machine
+- [x] **STATE-02**: Server broadcasts state changes to client
+- [x] **STATE-03**: Server handles barge-in (stops TTS, clears buffers)
 
 ### Transport (Server)
 
@@ -120,9 +120,9 @@ Which phases cover which requirements. Updated by create-roadmap.
 | STT-01 | Phase 3 | Complete |
 | STT-02 | Phase 3 | Complete |
 | STT-03 | Phase 3 | Complete |
-| STATE-01 | Phase 4 | Pending |
-| STATE-02 | Phase 4 | Pending |
-| STATE-03 | Phase 4 | Pending |
+| STATE-01 | Phase 4 | Complete |
+| STATE-02 | Phase 4 | Complete |
+| STATE-03 | Phase 4 | Complete |
 | LLM-01 | Phase 5 | Pending |
 | LLM-02 | Phase 5 | Pending |
 | LLM-03 | Phase 5 | Pending |
@@ -151,4 +151,4 @@ Which phases cover which requirements. Updated by create-roadmap.
 
 ---
 *Requirements defined: 2026-01-26*
-*Last updated: 2026-01-26 after Phase 3 completion*
+*Last updated: 2026-01-26 after Phase 4 completion*
