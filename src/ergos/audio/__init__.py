@@ -11,6 +11,11 @@ from ergos.audio.types import (
     CHUNK_SIZE,
     CHUNK_DURATION_MS,
 )
+from ergos.audio.buffer import (
+    AudioBuffer,
+    AudioInputStream,
+    AudioOutputStream,
+)
 
 __all__ = [
     "AudioFrame",
@@ -21,4 +26,7 @@ __all__ = [
     "SAMPLE_WIDTH",
     "CHUNK_SIZE",
     "CHUNK_DURATION_MS",
+    "AudioBuffer",
+    "AudioInputStream",
+    "AudioOutputStream",
 ]
