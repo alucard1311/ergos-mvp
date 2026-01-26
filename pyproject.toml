@@ -30,6 +30,7 @@ dependencies = [
     "fastapi>=0.100",
     "uvicorn>=0.20",
     "faster-whisper>=1.0",
+    "llama-cpp-python>=0.2",
 ]
 
 [project.optional-dependencies]
