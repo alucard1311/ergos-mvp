@@ -170,7 +170,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8 →
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Foundation | 0/TBD | Not started | - |
+| 1. Foundation | 1/2 | In progress | - |
 | 2. Audio Infrastructure | 0/TBD | Not started | - |
 | 3. STT Pipeline | 0/TBD | Not started | - |
 | 4. State Machine | 0/TBD | Not started | - |
