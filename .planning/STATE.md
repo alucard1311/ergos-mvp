@@ -10,28 +10,28 @@ See: .planning/PROJECT.md (updated 2026-01-26)
 ## Current Position
 
 Phase: 2 of 12 (Audio Infrastructure)
-Plan: 1/2 complete
-Status: In progress
-Last activity: 2026-01-26 — Completed 02-01-PLAN.md (Audio Types and Buffers)
+Plan: 2/2 complete
+Status: Phase complete
+Last activity: 2026-01-26 — Completed 02-02-PLAN.md (VAD and Pipeline)
 
-Progress: ██░░░░░░░░ 21%
+Progress: ███░░░░░░░ 29%
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 3
-- Average duration: 4.3 min
-- Total execution time: 13 min
+- Total plans completed: 4
+- Average duration: 4 min
+- Total execution time: 16 min
 
 **By Phase:**
 
 | Phase | Plans | Total | Avg/Plan |
 |-------|-------|-------|----------|
 | 1-foundation | 2 | 11 min | 5.5 min |
-| 2-audio-infrastructure | 1 | 2 min | 2 min |
+| 2-audio-infrastructure | 2 | 5 min | 2.5 min |
 
 **Recent Trend:**
-- Last 5 plans: 01-01 (5 min), 01-02 (6 min), 02-01 (2 min)
+- Last 5 plans: 01-01 (5 min), 01-02 (6 min), 02-01 (2 min), 02-02 (3 min)
 - Trend: Accelerating
 
 ## Accumulated Context
@@ -52,6 +52,9 @@ Recent decisions affecting current work:
 - Signal handlers for SIGINT and SIGTERM (01-02)
 - Audio format: 16kHz, mono, 16-bit, 30ms chunks (02-01)
 - asyncio.Queue for thread-safe audio buffering (02-01)
+- VAD runs on client, server receives events via data channel (02-02)
+- Async callbacks for non-blocking VAD/audio notification (02-02)
+- PipelineState enum matching state machine phases (02-02)
 
 ### Pending Todos
 
@@ -63,6 +66,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-01-26T19:29:52Z
-Stopped at: Completed 02-01-PLAN.md (Audio Types and Buffers)
+Last session: 2026-01-26T19:33:00Z
+Stopped at: Completed 02-02-PLAN.md (VAD and Pipeline) — Phase 2 complete
 Resume file: None

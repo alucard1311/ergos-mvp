@@ -11,7 +11,7 @@ Ergos is a local-first voice assistant with a Python server (STT, LLM, TTS pipel
 - Decimal phases (2.1, 2.2): Urgent insertions (marked with INSERTED)
 
 - [x] **Phase 1: Foundation** - Project scaffolding, CLI, configuration system
-- [ ] **Phase 2: Audio Infrastructure** - Server audio receive/send, VAD processing
+- [x] **Phase 2: Audio Infrastructure** - Server audio receive/send, VAD processing
 - [ ] **Phase 3: STT Pipeline** - Speech-to-text with streaming transcription
 - [ ] **Phase 4: State Machine** - Conversation flow orchestration with barge-in
 - [ ] **Phase 5: LLM Integration** - Phi-3 Mini with streaming tokens
@@ -171,7 +171,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8 →
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. Foundation | 2/2 | Complete | 2026-01-26 |
-| 2. Audio Infrastructure | 1/2 | In progress | - |
+| 2. Audio Infrastructure | 2/2 | Complete | 2026-01-26 |
 | 3. STT Pipeline | 0/TBD | Not started | - |
 | 4. State Machine | 0/TBD | Not started | - |
 | 5. LLM Integration | 0/TBD | Not started | - |
