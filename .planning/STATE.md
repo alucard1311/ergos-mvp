@@ -5,23 +5,23 @@
 See: .planning/PROJECT.md (updated 2026-01-26)
 
 **Core value:** Complete privacy through local-only processing
-**Current focus:** Phase 10 — Flutter Client UI
+**Current focus:** Phase 12 — Integration Latency
 
 ## Current Position
 
-Phase: 11 of 12 (Flutter Client Platform)
-Plan: 1 of 1 in current phase
-Status: Phase complete
-Last activity: 2026-01-26 — Phase 11 verified and complete
+Phase: 12 of 12 (Integration Latency)
+Plan: 2 of 2 in current phase
+Status: Plan 12-02 complete
+Last activity: 2026-01-26 — Latency instrumentation added
 
-Progress: ██████████████████████████ 95.8%
+Progress: ██████████████████████████ 100%
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 23
+- Total plans completed: 25
 - Average duration: 2.4 min
-- Total execution time: 56 min
+- Total execution time: 62 min
 
 **By Phase:**
 
@@ -38,10 +38,11 @@ Progress: ███████████████████████�
 | 9-flutter-client-core | 3 | 8 min | 2.7 min |
 | 10-flutter-client-ui | 2 | 6 min | 3 min |
 | 11-flutter-client-platform | 1 | 2 min | 2 min |
+| 12-integration-latency | 2 | 6 min | 3 min |
 
 **Recent Trend:**
-- Last 5 plans: 09-03 (3 min), 10-01 (3 min), 10-02 (3 min), 11-01 (2 min)
-- Trend: Platform config was lightweight (configuration only)
+- Last 5 plans: 10-01 (3 min), 10-02 (3 min), 11-01 (2 min), 12-01 (3 min), 12-02 (3 min)
+- Trend: Integration phase completes final wiring and latency instrumentation
 
 ## Accumulated Context
 
@@ -115,6 +116,9 @@ Recent decisions affecting current work:
 - Dark theme with 0xFF1A1A2E background for better orb visibility (10-02)
 - Barge-in timestamp as millisecondsSinceEpoch / 1000 for float format (10-02)
 - "Tap to interrupt" hint only shown during SPEAKING state (10-02)
+- LatencyMetrics keeps rolling window of 100 samples for percentile calculation (12-02)
+- Latency measured from VAD SPEECH_END to first TTS audio chunk (12-02)
+- Latency logged as: current, P50, P95, mean with sample count (12-02)
 
 ### Pending Todos
 
@@ -127,5 +131,5 @@ None yet.
 ## Session Continuity
 
 Last session: 2026-01-26
-Stopped at: Phase 11 complete — Flutter Client Platform configured
+Stopped at: Phase 12 complete — All phases complete
 Resume file: None
