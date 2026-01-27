@@ -8,7 +8,10 @@ from enum import Enum
 from pathlib import Path
 from typing import Optional
 
+from aiohttp import web
+
 from ergos.config import Config
+from ergos.pipeline import Pipeline, create_pipeline
 
 logger = logging.getLogger(__name__)
 
@@ -32,6 +35,8 @@ class Server:
         self.config = config
         self.state = ServerState.STOPPED
         self._shutdown_event: Optional[asyncio.Event] = None
+        self._pipeline: Optional[Pipeline] = None
+        self._runner: Optional[web.AppRunner] = None
 
     async def start(self) -> None:
         """Start the server."""
@@ -54,10 +59,32 @@ class Server:
         for sig in (signal.SIGINT, signal.SIGTERM):
             loop.add_signal_handler(sig, self._signal_handler)
 
+        # Create and start the pipeline
+        self._pipeline = await create_pipeline(self.config)
+
+        # Create aiohttp runner and site
+        self._runner = web.AppRunner(self._pipeline.app)
+        await self._runner.setup()
+        site = web.TCPSite(
+            self._runner,
+            self.config.server.host,
+            self.config.server.port,
+        )
+        await site.start()
+
         self.state = ServerState.RUNNING
+
+        # Log startup information
         logger.info(
             f"Ergos server running on {self.config.server.host}:{self.config.server.port}"
         )
+        logger.info("Pipeline initialized")
+        logger.info(f"  STT: faster-whisper ({self.config.stt.model})")
+        if self.config.llm.model_path:
+            logger.info(f"  LLM: llama.cpp ({self.config.llm.model_path})")
+        else:
+            logger.info("  LLM: not configured")
+        logger.info("  TTS: Kokoro ONNX")
 
         # Wait for shutdown signal
         await self._shutdown_event.wait()
@@ -71,6 +98,16 @@ class Server:
 
         self.state = ServerState.STOPPING
         logger.info("Stopping Ergos server...")
+
+        # Cleanup aiohttp runner
+        if self._runner is not None:
+            await self._runner.cleanup()
+            self._runner = None
+
+        # Cleanup pipeline connections
+        if self._pipeline is not None:
+            await self._pipeline.connection_manager.close_all()
+            self._pipeline = None
 
         # Cleanup PID file
         if PID_FILE.exists():
