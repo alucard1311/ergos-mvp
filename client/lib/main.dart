@@ -6,6 +6,7 @@ import 'models/connection_state.dart';
 import 'services/signaling_service.dart';
 import 'services/vad_service.dart';
 import 'services/webrtc_service.dart';
+import 'widgets/ergos_orb.dart';
 
 void main() {
   runApp(const ErgosApp());
@@ -101,6 +102,16 @@ class _ErgosAppState extends State<ErgosApp> {
     }
   }
 
+  /// Sends barge-in message to interrupt server speech.
+  void _sendBargeIn() {
+    if (_serverState == 'SPEAKING') {
+      _webRTCService.sendDataChannelMessage({
+        'type': 'barge_in',
+        'timestamp': DateTime.now().millisecondsSinceEpoch / 1000,
+      });
+    }
+  }
+
   /// Disconnects from the server.
   Future<void> _disconnect() async {
     await _vadService.stopListening();
@@ -124,52 +135,71 @@ class _ErgosAppState extends State<ErgosApp> {
     return MaterialApp(
       title: 'Ergos',
       theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(seedColor: Colors.blue),
+        colorScheme: ColorScheme.fromSeed(
+          seedColor: Colors.blue,
+          brightness: Brightness.dark,
+        ),
         useMaterial3: true,
       ),
       home: Scaffold(
+        backgroundColor: const Color(0xFF1A1A2E),
         appBar: AppBar(
-          backgroundColor: Theme.of(context).colorScheme.inversePrimary,
+          backgroundColor: const Color(0xFF1A1A2E),
           title: const Text('Ergos'),
         ),
-        body: Center(
-          child: Padding(
-            padding: const EdgeInsets.all(24.0),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                // Connection state
-                Text(
-                  'Connection: ${_connectionState.name}',
-                  style: Theme.of(context).textTheme.titleLarge,
-                ),
-                const SizedBox(height: 8),
-
-                // Data channel state
-                Text(
-                  'Data Channel: ${_dataChannelReady ? "Ready" : "Not Ready"}',
-                  style: Theme.of(context).textTheme.bodyLarge,
-                ),
-                const SizedBox(height: 8),
-
-                // Server state
-                Text(
-                  'Server: $_serverState',
-                  style: Theme.of(context).textTheme.bodyLarge,
-                ),
-                const SizedBox(height: 24),
-
-                // Server URL
-                Text(
-                  'Server: $_serverUrl',
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: Colors.grey,
+        body: SafeArea(
+          child: Column(
+            children: [
+              // Main content area with orb
+              Expanded(
+                child: Center(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      // Animated orb
+                      ErgosOrb(
+                        serverState: _serverState,
+                        onBargeIn: _sendBargeIn,
                       ),
+                      const SizedBox(height: 24),
+                      // Tap hint (only when speaking)
+                      Text(
+                        _serverState == 'SPEAKING' ? 'Tap to interrupt' : '',
+                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                              color: Colors.white70,
+                            ),
+                      ),
+                    ],
+                  ),
                 ),
-                const SizedBox(height: 24),
+              ),
 
-                // Connect/Disconnect button
-                ElevatedButton(
+              // Status info section
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 24.0),
+                child: Column(
+                  children: [
+                    Text(
+                      'Connection: ${_connectionState.name}',
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                            color: Colors.white54,
+                          ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      'Server: $_serverState',
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                            color: Colors.white54,
+                          ),
+                    ),
+                  ],
+                ),
+              ),
+
+              // Connect/Disconnect button
+              Padding(
+                padding: const EdgeInsets.all(24.0),
+                child: ElevatedButton(
                   onPressed: _connectionState == ClientConnectionState.connecting
                       ? null
                       : () {
@@ -187,8 +217,8 @@ class _ErgosAppState extends State<ErgosApp> {
                             : 'Connect',
                   ),
                 ),
-              ],
-            ),
+              ),
+            ],
           ),
         ),
       ),
