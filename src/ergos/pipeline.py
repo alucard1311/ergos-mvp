@@ -10,8 +10,9 @@ import numpy as np
 from aiohttp import web
 
 from ergos.audio.types import AudioChunk, AudioFrame
-from ergos.audio.vad import VADProcessor
+from ergos.audio.vad import VADProcessor, VADEvent, VADEventType
 from ergos.config import Config
+from ergos.metrics import LatencyTracker
 from ergos.llm.generator import LLMGenerator
 from ergos.llm.processor import LLMProcessor
 from ergos.persona.loader import DEFAULT_PERSONA, load_persona
@@ -45,6 +46,7 @@ class Pipeline:
     tts_processor: TTSProcessor
     connection_manager: ConnectionManager
     data_handler: DataChannelHandler
+    latency_tracker: LatencyTracker
     app: web.Application
 
 
@@ -156,6 +158,10 @@ async def create_pipeline(config: Config) -> Pipeline:
     )
     logger.debug("Created data channel handler")
 
+    # 8. Create latency tracker
+    latency_tracker = LatencyTracker()
+    logger.debug("Created latency tracker")
+
     # ========== Wire callbacks ==========
 
     # Register state change broadcast via data channels
@@ -165,6 +171,15 @@ async def create_pipeline(config: Config) -> Pipeline:
     # Register STT processor as VAD event listener
     vad_processor.add_callback(stt_processor.on_vad_event)
     logger.debug("Wired: VAD -> STT processor")
+
+    # Register latency tracking for VAD speech_end events
+    async def on_vad_for_latency(event: VADEvent) -> None:
+        """Mark speech_end time for latency tracking."""
+        if event.type == VADEventType.SPEECH_END:
+            latency_tracker.mark_speech_end()
+
+    vad_processor.add_callback(on_vad_for_latency)
+    logger.debug("Wired: VAD -> latency tracker (speech_end)")
 
     # Register LLM processor as STT transcription callback
     stt_processor.add_transcription_callback(llm_processor.process_transcription)
@@ -176,14 +191,24 @@ async def create_pipeline(config: Config) -> Pipeline:
 
     # Create audio output callback that pushes to all TTSAudioTracks
     async def on_tts_audio(samples: np.ndarray, sample_rate: int) -> None:
-        """Push TTS audio samples to all connected WebRTC tracks."""
+        """Push TTS audio samples to all connected WebRTC tracks.
+
+        Also marks first audio for latency tracking on the first chunk
+        after speech_end.
+        """
+        # Mark first audio for latency tracking
+        if latency_tracker.is_waiting_for_audio:
+            latency_tracker.mark_first_audio()
+            latency_tracker.log_current()
+            latency_tracker.reset()
+
         for pc in list(connection_manager._connections):
             track = connection_manager.get_track(pc)
             if track is not None:
                 track.push_audio(samples)
 
     tts_processor.add_audio_callback(on_tts_audio)
-    logger.debug("Wired: TTS -> WebRTC audio tracks")
+    logger.debug("Wired: TTS -> WebRTC audio tracks (with latency tracking)")
 
     # Register TTS buffer clear as barge-in callback
     async def on_barge_in() -> None:
@@ -247,5 +272,6 @@ async def create_pipeline(config: Config) -> Pipeline:
         tts_processor=tts_processor,
         connection_manager=connection_manager,
         data_handler=data_handler,
+        latency_tracker=latency_tracker,
         app=app,
     )
