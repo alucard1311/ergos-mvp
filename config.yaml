@@ -1,24 +1,19 @@
-# Ergos Configuration
-
-server:
-  host: "0.0.0.0"
-  port: 8765
-
-stt:
-  model: "base"  # Options: tiny, base, small, medium, large
-  device: "auto"  # Options: auto, cuda, cpu
-
 llm:
-  # model_path: "/path/to/phi-3-mini.gguf"  # Required for operation
-  context_length: 4096
-  max_tokens: 512
-  device: "auto"
-
-tts:
-  voice: "af_heart"  # Kokoro voice
-  speed: 1.0
-  device: "auto"
-
+  context_length: 1024
+  device: auto
+  max_tokens: 256
+  model_path: ~/.ergos/models/Phi-3-mini-4k-instruct-q4.gguf
 persona:
-  name: "Ergos"
-  system_prompt: "You are a helpful voice assistant. Keep responses concise and natural for voice interaction."
+  name: Ergos
+  persona_file: null
+  system_prompt: You are a helpful voice assistant.
+server:
+  host: 0.0.0.0
+  port: 8765
+stt:
+  device: auto
+  model: tiny.en
+tts:
+  device: auto
+  speed: 1.0
+  voice: af_heart

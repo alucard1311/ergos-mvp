@@ -1,5 +1,6 @@
 """TTS processor with sentence chunking and streaming audio."""
 
+import asyncio
 import logging
 from dataclasses import dataclass, field
 
@@ -27,6 +28,10 @@ class TTSProcessor:
     # Internal state (not init parameters)
     _buffer: str = field(default="", init=False)
     _audio_callbacks: list[AudioCallback] = field(default_factory=list, init=False)
+    _cancelled: bool = field(default=False, init=False)  # Cancellation flag for synthesis
+    _synthesis_lock: asyncio.Lock = field(default_factory=asyncio.Lock, init=False)  # Serialize synthesis calls
+    _is_synthesizing: bool = field(default=False, init=False)  # Track if synthesis is in progress
+    _total_audio_duration_ms: float = field(default=0.0, init=False)  # Track total audio generated
 
     async def receive_token(self, token: str) -> None:
         """Receive a token from LLM and process when sentence complete.
@@ -38,11 +43,13 @@ class TTSProcessor:
             token: A text token from the LLM stream.
         """
         self._buffer += token
+        logger.debug(f"TTS: Received token, buffer now: '{self._buffer[:50]}...'")
 
         # Check for sentence boundary
         if self._has_complete_sentence():
             sentence = self._extract_sentence()
             if sentence.strip():
+                logger.info(f"TTS: Complete sentence, synthesizing: '{sentence[:50]}...'")
                 await self._synthesize_and_stream(sentence)
 
     def _has_complete_sentence(self) -> bool:
@@ -83,18 +90,55 @@ class TTSProcessor:
 
         Args:
             text: The text to synthesize.
+
+        Note:
+            Uses a lock to serialize synthesis calls. This prevents multiple
+            concurrent syntheses which could lead to orphaned background tasks
+            in kokoro-onnx (its create_stream creates async tasks that continue
+            running even when the consumer stops iterating).
+
+            Respects the _cancelled flag. If cancel() is called during
+            synthesis, this method will stop yielding audio chunks.
+            Also handles CancelledError from external task cancellation.
         """
         preview = text[:50] + "..." if len(text) > 50 else text
         logger.debug(f"TTS: Synthesizing '{preview}'")
 
-        async for samples, sample_rate in self.synthesizer.synthesize_stream(
-            text, self.config
-        ):
-            for callback in self._audio_callbacks:
-                try:
-                    await callback(samples, sample_rate)
-                except Exception as e:
-                    logger.error(f"Audio callback error: {e}")
+        # Skip if already cancelled
+        if self._cancelled:
+            logger.debug("TTS: Skipping synthesis - already cancelled")
+            return
+
+        async with self._synthesis_lock:
+            # Double-check cancellation after acquiring lock
+            if self._cancelled:
+                logger.debug("TTS: Skipping synthesis - cancelled while waiting for lock")
+                return
+
+            self._is_synthesizing = True
+            try:
+                async for samples, sample_rate in self.synthesizer.synthesize_stream(
+                    text, self.config
+                ):
+                    # Check cancellation before processing each chunk
+                    if self._cancelled:
+                        logger.info("TTS: Synthesis cancelled, stopping stream")
+                        return
+
+                    # Track audio duration
+                    chunk_duration_ms = (len(samples) / sample_rate) * 1000
+                    self._total_audio_duration_ms += chunk_duration_ms
+
+                    for callback in self._audio_callbacks:
+                        try:
+                            await callback(samples, sample_rate)
+                        except Exception as e:
+                            logger.error(f"Audio callback error: {e}")
+            except asyncio.CancelledError:
+                logger.info("TTS: Synthesis task was cancelled")
+                raise  # Re-raise to properly handle cancellation
+            finally:
+                self._is_synthesizing = False
 
     async def flush(self) -> None:
         """Synthesize any remaining text in buffer.
@@ -114,6 +158,33 @@ class TTSProcessor:
         """
         self._buffer = ""
         logger.debug("TTS: Buffer cleared")
+
+    async def cancel(self) -> None:
+        """Cancel ongoing TTS synthesis.
+
+        Call this on barge-in to stop audio generation immediately.
+        Sets the cancellation flag which is checked by _synthesize_and_stream.
+
+        The synthesis lock ensures that any ongoing synthesis will complete
+        its current chunk before checking the cancellation flag. New synthesis
+        calls will see the flag and exit early.
+
+        NOTE: This is async to allow for a brief yield to let pending operations
+        notice the cancellation flag.
+        """
+        self._cancelled = True
+        self._buffer = ""
+        logger.info("TTS: Synthesis cancelled")
+
+        # Yield to allow any pending synthesis to check the cancellation flag
+        await asyncio.sleep(0)
+
+    def reset_cancellation(self) -> None:
+        """Reset the cancellation flag.
+
+        Call this when starting a new utterance to allow synthesis.
+        """
+        self._cancelled = False
 
     # Callback registration methods
 
@@ -157,3 +228,17 @@ class TTSProcessor:
             The current buffered text awaiting synthesis.
         """
         return self._buffer
+
+    @property
+    def is_synthesizing(self) -> bool:
+        """Check if synthesis is currently in progress."""
+        return self._is_synthesizing
+
+    @property
+    def total_audio_duration_ms(self) -> float:
+        """Get total audio duration generated in current session."""
+        return self._total_audio_duration_ms
+
+    def reset_audio_tracking(self) -> None:
+        """Reset audio duration tracking for new utterance."""
+        self._total_audio_duration_ms = 0.0

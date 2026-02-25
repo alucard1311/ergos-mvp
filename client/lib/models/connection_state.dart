@@ -6,6 +6,36 @@ enum ClientConnectionState {
   failed,
 }
 
+/// Application modes for different assistant experiences.
+enum AppMode {
+  /// Normal voice assistant mode.
+  normal,
+
+  /// Kitchen cooking assistant mode.
+  kitchen,
+}
+
+/// Extension to get display names for app modes.
+extension AppModeExtension on AppMode {
+  String get displayName {
+    switch (this) {
+      case AppMode.normal:
+        return 'Assistant';
+      case AppMode.kitchen:
+        return 'Kitchen';
+    }
+  }
+
+  String get description {
+    switch (this) {
+      case AppMode.normal:
+        return 'General voice assistant';
+      case AppMode.kitchen:
+        return 'Step-by-step cooking guide';
+    }
+  }
+}
+
 /// Represents a state change message from the server.
 class ServerState {
   /// The current server state (e.g., "IDLE", "LISTENING", "PROCESSING", "SPEAKING").
@@ -35,8 +65,8 @@ class ServerState {
   /// ```
   factory ServerState.fromJson(Map<String, dynamic> json) {
     return ServerState(
-      state: json['state'] as String,
-      previous: json['previous'] as String,
+      state: (json['state'] as String).toUpperCase(),
+      previous: (json['previous'] as String).toUpperCase(),
       timestamp: DateTime.now(),
     );
   }

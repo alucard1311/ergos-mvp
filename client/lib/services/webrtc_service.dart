@@ -1,9 +1,13 @@
 import 'dart:convert';
+import 'package:flutter/services.dart';
 import 'package:flutter_webrtc/flutter_webrtc.dart';
 
 import '../models/connection_state.dart';
 import '../utils/permissions.dart';
 import 'signaling_service.dart';
+
+// Platform channel for native audio control
+const _audioChannel = MethodChannel('com.ergos.client/audio');
 
 /// Callback type for connection state changes.
 typedef ConnectionStateCallback = void Function(ClientConnectionState state);
@@ -33,6 +37,9 @@ class WebRTCService {
 
   /// The local audio stream from the microphone.
   MediaStream? _localStream;
+
+  /// The remote audio stream from the server.
+  MediaStream? _remoteStream;
 
   /// Callback for connection state changes.
   ConnectionStateCallback? onConnectionStateChanged;
@@ -70,10 +77,27 @@ class WebRTCService {
     }
 
     // 2. Get local audio stream
+    // Enable ALL audio processing to maximize microphone gain
     _localStream = await navigator.mediaDevices.getUserMedia({
-      'audio': true,
+      'audio': {
+        'echoCancellation': true,
+        'noiseSuppression': true,
+        'autoGainControl': true,
+        'channelCount': 1,
+      },
       'video': false,
     });
+
+    // Enable speakerphone using native Android AudioManager
+    try {
+      await _audioChannel.invokeMethod('setSpeakerOn');
+      print('Native audio: Speaker enabled via AudioManager');
+    } catch (e) {
+      print('Native audio error: $e');
+    }
+    // Also try flutter_webrtc helper
+    await Helper.setSpeakerphoneOn(true);
+    print('Audio output configured: speaker mode enabled');
 
     // 3. Create peer connection with STUN
     _pc = await createPeerConnection({
@@ -101,10 +125,29 @@ class WebRTCService {
     };
 
     // 5. Set up onTrack callback for incoming server audio
-    _pc!.onTrack = (RTCTrackEvent event) {
+    _pc!.onTrack = (RTCTrackEvent event) async {
       if (event.track.kind == 'audio') {
-        // Audio plays automatically through device speaker
-        print('Received server audio track');
+        print('Received server audio track: ${event.track.id}');
+        print('Track enabled: ${event.track.enabled}, muted: ${event.track.muted}');
+
+        // Add the remote track to a stream for playback
+        if (event.streams.isNotEmpty) {
+          _remoteStream = event.streams[0];
+          print('Remote stream has ${_remoteStream!.getAudioTracks().length} audio tracks');
+
+          // Ensure all audio tracks are enabled
+          for (var track in _remoteStream!.getAudioTracks()) {
+            track.enabled = true;
+            print('Enabled audio track: ${track.id}');
+          }
+        }
+
+        // Ensure the track is enabled
+        event.track.enabled = true;
+
+        // Configure audio session for playback - route to speaker
+        await Helper.setSpeakerphoneOn(true);
+        print('Audio configured: speakerphone ON');
       }
     };
 
@@ -123,9 +166,11 @@ class WebRTCService {
     // 8. Set up data channel onMessage handler
     _dataChannel!.onMessage = (RTCDataChannelMessage message) {
       try {
+        print('Received data channel message: ${message.text}');
         final data = jsonDecode(message.text) as Map<String, dynamic>;
         if (data['type'] == 'state_change') {
           final serverState = ServerState.fromJson(data);
+          print('State change: ${serverState.state}');
           onServerStateChanged?.call(serverState);
         }
       } catch (e) {
@@ -169,7 +214,7 @@ class WebRTCService {
 
   /// Disconnects from the WebRTC server.
   ///
-  /// Closes the data channel, peer connection, and disposes the local stream.
+  /// Closes the data channel, peer connection, and disposes streams.
   Future<void> disconnect() async {
     // Close data channel
     await _dataChannel?.close();
@@ -179,9 +224,11 @@ class WebRTCService {
     await _pc?.close();
     _pc = null;
 
-    // Dispose local stream
+    // Dispose streams
     _localStream?.dispose();
     _localStream = null;
+    _remoteStream?.dispose();
+    _remoteStream = null;
 
     onConnectionStateChanged?.call(ClientConnectionState.disconnected);
   }

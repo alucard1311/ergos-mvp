@@ -1,9 +1,13 @@
 """Ergos CLI interface."""
 
 import asyncio
+import faulthandler
 import logging
 import sys
 from pathlib import Path
+
+# Enable faulthandler to get stack traces on segfaults
+faulthandler.enable()
 
 import click
 
@@ -13,13 +17,25 @@ from ergos.server import Server
 
 
 def setup_logging(verbose: bool) -> None:
-    """Configure logging based on verbosity."""
-    level = logging.DEBUG if verbose else logging.INFO
+    """Configure logging based on verbosity.
+
+    In normal mode: ergos logs at INFO, third-party libs at WARNING.
+    In verbose mode: ergos logs at DEBUG, third-party libs at INFO.
+    """
+    # Set ergos level based on verbosity
+    ergos_level = logging.DEBUG if verbose else logging.INFO
+    # Keep third-party libs quieter
+    third_party_level = logging.INFO if verbose else logging.WARNING
+
     logging.basicConfig(
-        level=level,
+        level=ergos_level,
         format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
         datefmt="%H:%M:%S",
     )
+
+    # Silence noisy third-party loggers
+    for lib in ["aiortc", "aioice", "av", "PIL", "urllib3"]:
+        logging.getLogger(lib).setLevel(third_party_level)
 
 
 @click.group()

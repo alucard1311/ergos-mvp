@@ -27,8 +27,12 @@ class STTProcessor:
     enable_partials: bool = True
     partial_interval_ms: float = 500  # Emit partials every 500ms
 
+    # Target sample rate for Whisper
+    target_sample_rate: int = 16000
+
     # Internal state (not init params)
     _audio_buffer: bytearray = field(default_factory=bytearray, init=False)
+    _source_sample_rate: int = field(default=16000, init=False)  # Track source rate
     _is_accumulating: bool = field(default=False, init=False)
     _transcription_callbacks: list[TranscriptionCallback] = field(
         default_factory=list, init=False
@@ -50,6 +54,8 @@ class STTProcessor:
         """
         if chunk.is_speech or self._is_accumulating:
             self._audio_buffer.extend(chunk.data)
+            # Track source sample rate from first chunk
+            self._source_sample_rate = chunk.frame.sample_rate
 
     async def on_vad_event(self, event: VADEvent) -> None:
         """Called when VAD events occur.
@@ -86,37 +92,96 @@ class STTProcessor:
 
     async def _process_accumulated_audio(self) -> None:
         """Transcribe accumulated audio buffer."""
+        import numpy as np
+        import wave
+
         audio_bytes = bytes(self._audio_buffer)
         self._audio_buffer.clear()
 
-        # Less than 100ms at 16kHz (1600 bytes = 100ms * 16 samples/ms * 2 bytes/sample)
-        if len(audio_bytes) < 1600:
-            logger.debug("STT: Audio too short (%d bytes), skipping", len(audio_bytes))
+        # Convert to numpy array
+        audio_array = np.frombuffer(audio_bytes, dtype=np.int16)
+
+        # DEBUG: Log sample count and compute implied duration at reported rate
+        sample_count = len(audio_array)
+        implied_duration_at_reported_rate = sample_count / self._source_sample_rate
+        logger.info(
+            "STT DEBUG: %d samples, reported rate=%dHz, implied duration=%.2fs",
+            sample_count, self._source_sample_rate, implied_duration_at_reported_rate
+        )
+
+        # Convert to float for processing
+        audio_float = audio_array.astype(np.float32)
+
+        # Resample if needed (e.g., 48kHz WebRTC -> 16kHz Whisper)
+        if self._source_sample_rate != self.target_sample_rate:
+            from scipy.signal import resample_poly
+            # Use polyphase resampling - stable and efficient
+            logger.info(
+                "STT: Resampling %d samples from %dHz to %dHz",
+                len(audio_array), self._source_sample_rate, self.target_sample_rate
+            )
+            down_factor = self._source_sample_rate // self.target_sample_rate
+            audio_float = resample_poly(audio_float, up=1, down=down_factor)
+
+        # Apply gain normalization to entire buffer (not per-chunk)
+        # Target peak around 50% of int16 max for good dynamic range
+        # Some Android devices capture very quiet audio, so we need aggressive gain
+        peak = max(abs(audio_float.min()), abs(audio_float.max()))
+        if peak > 0 and peak < 20000:  # Amplify if below ~60% of full range
+            target_peak = 20000
+            gain = min(target_peak / peak, 50.0)  # Cap gain at 50x for very quiet input
+            audio_float = audio_float * gain
+            logger.info("STT: Applied gain %.1fx (peak was %.0f, new peak %.0f)", gain, peak, peak * gain)
+
+        audio_array = np.clip(audio_float, -32768, 32767).astype(np.int16)
+
+        # Less than 100ms at target rate
+        min_samples = int(self.target_sample_rate * 0.1)  # 100ms
+        if len(audio_array) < min_samples:
+            logger.debug("STT: Audio too short (%d samples), skipping", len(audio_array))
             return
 
-        logger.info("STT: Processing %d bytes of audio", len(audio_bytes))
+        logger.info("STT: Processing %d samples of audio", len(audio_array))
+
+        # Convert back to bytes
+        audio_bytes = audio_array.tobytes()
+
+        # Save audio for debugging
+        debug_path = "/tmp/ergos_debug_audio.wav"
+        with wave.open(debug_path, 'wb') as wf:
+            wf.setnchannels(1)
+            wf.setsampwidth(2)  # 16-bit
+            wf.setframerate(self.target_sample_rate)
+            wf.writeframes(audio_bytes)
+        logger.info("STT: Saved debug audio to %s", debug_path)
 
         # Run transcription in thread pool to not block event loop
         loop = asyncio.get_event_loop()
         try:
             result = await loop.run_in_executor(
-                None, self.transcriber.transcribe, audio_bytes
+                None, self.transcriber.transcribe, audio_bytes, self.target_sample_rate
             )
         except Exception as e:
             logger.error("STT transcription error: %s", e)
             return
 
+        logger.info("STT: Raw transcription result: %s", repr(result.text))
         if result.text.strip():
             logger.info("STT: Transcribed: %s", result.text)
             self._transcription_count += 1
+            logger.info("STT: Calling %d transcription callbacks", len(self._transcription_callbacks))
             for callback in self._transcription_callbacks:
                 try:
                     await callback(result)
                 except Exception as e:
                     logger.error("Transcription callback error: %s", e)
+        else:
+            logger.warning("STT: Empty transcription result, skipping callbacks")
 
     async def _start_partial_loop(self) -> None:
         """Periodically transcribe partial audio while speaking."""
+        import numpy as np
+
         while self._is_accumulating and self.enable_partials:
             await asyncio.sleep(self.partial_interval_ms / 1000)
 
@@ -125,15 +190,30 @@ class STTProcessor:
 
             current_buffer = bytes(self._audio_buffer)
 
-            # At least 200ms of audio (3200 bytes = 200ms * 16 samples/ms * 2 bytes/sample)
-            if len(current_buffer) < 3200:
+            # At least 200ms of audio at source rate
+            # (200ms * source_rate samples/sec * 2 bytes/sample)
+            min_bytes = int(0.2 * self._source_sample_rate * 2)
+            if len(current_buffer) < min_bytes:
                 continue
+
+            # Convert to numpy and resample if needed (same as final transcription)
+            audio_array = np.frombuffer(current_buffer, dtype=np.int16)
+            audio_float = audio_array.astype(np.float32)
+
+            if self._source_sample_rate != self.target_sample_rate:
+                from scipy.signal import resample_poly
+
+                down_factor = self._source_sample_rate // self.target_sample_rate
+                audio_float = resample_poly(audio_float, up=1, down=down_factor)
+
+            audio_resampled = np.clip(audio_float, -32768, 32767).astype(np.int16)
+            resampled_bytes = audio_resampled.tobytes()
 
             # Run partial transcription in thread pool
             loop = asyncio.get_event_loop()
             try:
                 result = await loop.run_in_executor(
-                    None, self.transcriber.transcribe, current_buffer
+                    None, self.transcriber.transcribe, resampled_bytes, self.target_sample_rate
                 )
                 if result.text.strip():
                     logger.debug("STT partial: %s", result.text)

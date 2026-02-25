@@ -37,9 +37,57 @@ async def _process_incoming_audio(
                 # Convert AudioFrame to numpy array
                 # frame.to_ndarray() returns shape (channels, samples)
                 samples = frame.to_ndarray()
-                # Flatten to 1D for mono processing
+
+                # DEBUG: Log raw frame info including layout/channels
+                logger.info(
+                    f"Raw frame: format={frame.format.name}, layout={frame.layout.name}, "
+                    f"frame.samples={frame.samples}, sample_rate={frame.sample_rate}, "
+                    f"ndarray shape={samples.shape}, dtype={samples.dtype}"
+                )
+
+                # Handle different audio formats:
+                # - Planar formats (s16p, fltp): shape = (channels, samples_per_channel)
+                # - Packed/Interleaved formats (s16, flt): shape = (1, samples * channels)
+                #   where samples are interleaved: L0,R0,L1,R1,...
+
+                is_planar = frame.format.is_planar
+                num_channels = len(frame.layout.channels)
+
                 if samples.ndim > 1:
-                    samples = samples[0]
+                    samples = samples[0]  # Flatten to 1D first
+
+                if not is_planar and num_channels == 2:
+                    # Interleaved stereo: LRLRLR... - take every other sample for mono
+                    logger.info(f"Interleaved stereo detected ({len(samples)} total), extracting mono")
+                    # CRITICAL: Use .copy() to create contiguous array, not a strided view.
+                    # Strided views (samples[::2]) are non-contiguous and cause segfaults
+                    # when passed to native code (av/ffmpeg).
+                    samples = samples[::2].copy()  # Take left channel samples
+                    logger.info(f"After stereo->mono: {len(samples)} samples")
+                elif is_planar and samples.ndim > 1:
+                    # Planar: shape was (channels, samples), already flattened above
+                    logger.info(f"Planar audio, using channel 0: {len(samples)} samples")
+
+                # Handle both int16 and float audio formats from WebRTC
+                # Opus decoder typically outputs s16 (int16), but some configurations
+                # may produce float audio in [-1, 1] range
+                if samples.dtype in (np.float32, np.float64):
+                    # Float audio in [-1, 1] range - convert to int16
+                    logger.debug(
+                        f"Converting float audio (dtype={samples.dtype}, "
+                        f"range=[{samples.min():.4f}, {samples.max():.4f}]) to int16"
+                    )
+                    samples = (np.clip(samples, -1.0, 1.0) * 32767).astype(np.int16)
+                elif samples.dtype != np.int16:
+                    # Other integer types - clip and convert
+                    samples = np.clip(samples, -32768, 32767).astype(np.int16)
+                # else: already int16, use as-is
+
+                # Final safety check: ensure array is C-contiguous before passing
+                # to callback (which may use native code that requires contiguous memory)
+                if not samples.flags['C_CONTIGUOUS']:
+                    samples = np.ascontiguousarray(samples)
+
                 await callback(samples, frame.sample_rate)
         except MediaStreamError:
             logger.info("Incoming audio track ended")

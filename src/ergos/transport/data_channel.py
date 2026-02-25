@@ -3,13 +3,16 @@
 import asyncio
 import json
 import logging
-from typing import Callable, Optional
+from typing import Awaitable, Callable, Optional
 
 from ergos.audio.vad import VADProcessor
 from ergos.state import ConversationStateMachine
 from ergos.state.events import StateChangeEvent
 
 logger = logging.getLogger(__name__)
+
+# Type alias for text input callback
+TextInputCallback = Callable[[str], Awaitable[None]]
 
 
 class DataChannelHandler:
@@ -36,6 +39,7 @@ class DataChannelHandler:
         self._vad_processor = vad_processor
         self._state_machine = state_machine
         self._channels: set = set()
+        self._text_input_callback: Optional[TextInputCallback] = None
 
     def register_channel(self, channel) -> None:
         """
@@ -56,6 +60,15 @@ class DataChannelHandler:
             self._channels.discard(channel)
             logger.info(f"Data channel closed (remaining: {len(self._channels)})")
 
+    def set_text_input_callback(self, callback: TextInputCallback) -> None:
+        """
+        Set the callback for handling text input messages.
+
+        Args:
+            callback: Async function to process text input (e.g., plugin router)
+        """
+        self._text_input_callback = callback
+
     async def handle_message(self, message: str) -> None:
         """
         Handle an incoming data channel message.
@@ -75,6 +88,12 @@ class DataChannelHandler:
             await self._handle_vad_event(data)
         elif msg_type == "barge_in":
             await self._handle_barge_in(data)
+        elif msg_type == "text_input":
+            await self._handle_text_input(data)
+        elif msg_type == "mode_change":
+            # Mode change is informational, logged but not processed
+            mode = data.get("mode", "unknown")
+            logger.info(f"Client mode changed to: {mode}")
         else:
             logger.warning(f"Unknown message type: {msg_type}")
 
@@ -99,8 +118,30 @@ class DataChannelHandler:
         Args:
             data: Parsed message data for barge-in
         """
-        logger.info("Barge-in request received via data channel")
+        logger.info("Barge-in request received, interrupting")
         await self._state_machine.barge_in()
+
+    async def _handle_text_input(self, data: dict) -> None:
+        """
+        Handle a text input message (e.g., mode activation command).
+
+        Args:
+            data: Parsed message data containing text input
+        """
+        text = data.get("text", "")
+        if not text:
+            logger.warning("Text input message missing 'text' field")
+            return
+
+        logger.info(f"Text input received: {text}")
+
+        if self._text_input_callback is not None:
+            try:
+                await self._text_input_callback(text)
+            except Exception as e:
+                logger.error(f"Text input callback error: {e}")
+        else:
+            logger.warning("No text input callback registered, ignoring message")
 
     async def broadcast_state_change(self, event: StateChangeEvent) -> None:
         """

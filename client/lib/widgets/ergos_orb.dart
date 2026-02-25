@@ -8,6 +8,9 @@ import 'orb_painter.dart';
 /// - LISTENING: Blue, gentle pulsing
 /// - PROCESSING: Amber, faster pulsing
 /// - SPEAKING: Green, gentle pulsing (tap to barge-in)
+///
+/// When [isKitchenMode] is true, uses a warmer color palette
+/// with orange/red tones to indicate cooking mode.
 class ErgosOrb extends StatefulWidget {
   /// Current server state: IDLE, LISTENING, PROCESSING, or SPEAKING.
   final String serverState;
@@ -15,10 +18,14 @@ class ErgosOrb extends StatefulWidget {
   /// Callback invoked when user taps during SPEAKING state (barge-in).
   final VoidCallback? onBargeIn;
 
+  /// Whether kitchen mode is active (uses different color scheme).
+  final bool isKitchenMode;
+
   const ErgosOrb({
     super.key,
     required this.serverState,
     this.onBargeIn,
+    this.isKitchenMode = false,
   });
 
   @override
@@ -47,12 +54,12 @@ class _ErgosOrbState extends State<ErgosOrb>
       curve: Curves.easeInOut,
     ));
 
-    _updateForState(widget.serverState);
+    _updateForState(widget.serverState, isKitchenMode: widget.isKitchenMode);
   }
 
   /// Updates animation and color based on the given state.
-  void _updateForState(String state) {
-    _currentColor = _colorForState(state);
+  void _updateForState(String state, {bool isKitchenMode = false}) {
+    _currentColor = _colorForState(state, isKitchenMode: isKitchenMode);
 
     switch (state) {
       case 'IDLE':
@@ -78,7 +85,26 @@ class _ErgosOrbState extends State<ErgosOrb>
   }
 
   /// Returns the appropriate color for each server state.
-  Color _colorForState(String state) {
+  ///
+  /// When [isKitchenMode] is true, uses warmer cooking-themed colors.
+  Color _colorForState(String state, {bool isKitchenMode = false}) {
+    if (isKitchenMode) {
+      // Kitchen mode: warmer colors (orange, red, yellow tones)
+      switch (state) {
+        case 'IDLE':
+          return const Color(0xFF8B5A2B); // Warm brown
+        case 'LISTENING':
+          return const Color(0xFFFF6B35); // Cooking orange
+        case 'PROCESSING':
+          return const Color(0xFFFFD700); // Golden yellow
+        case 'SPEAKING':
+          return const Color(0xFF4CAF50); // Chef green
+        default:
+          return const Color(0xFF8B5A2B); // Warm brown
+      }
+    }
+
+    // Normal mode: cool colors (blue, grey tones)
     switch (state) {
       case 'IDLE':
         return const Color(0xFF6B7280); // Grey
@@ -96,9 +122,10 @@ class _ErgosOrbState extends State<ErgosOrb>
   @override
   void didUpdateWidget(ErgosOrb oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (widget.serverState != oldWidget.serverState) {
+    if (widget.serverState != oldWidget.serverState ||
+        widget.isKitchenMode != oldWidget.isKitchenMode) {
       setState(() {
-        _updateForState(widget.serverState);
+        _updateForState(widget.serverState, isKitchenMode: widget.isKitchenMode);
       });
     }
   }

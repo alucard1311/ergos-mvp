@@ -50,8 +50,14 @@ class ConnectionManager:
             state = pc.connectionState
             logger.debug(f"Connection state changed to: {state}")
             if state in ("failed", "closed"):
+                # CRITICAL: Stop the track BEFORE removing from tracking.
+                # This prevents segfaults from aiortc native code accessing
+                # freed resources if push_audio() is called during cleanup.
+                track = self._tracks.pop(pc, None)
+                if track is not None:
+                    track.stop()
+                    logger.debug("Stopped TTS audio track for closed connection")
                 self._connections.discard(pc)
-                self._tracks.pop(pc, None)
                 logger.info(f"Connection removed from tracking (state: {state})")
 
         logger.info("Created new RTCPeerConnection")
@@ -132,6 +138,12 @@ class ConnectionManager:
         all WebRTC resources are properly released.
         """
         logger.info(f"Closing {len(self._connections)} connections")
+
+        # CRITICAL: Stop all tracks BEFORE closing connections.
+        # This prevents segfaults from native code accessing freed resources.
+        for track in self._tracks.values():
+            track.stop()
+        logger.debug(f"Stopped {len(self._tracks)} TTS audio tracks")
 
         # Close all connections
         close_tasks = [pc.close() for pc in list(self._connections)]

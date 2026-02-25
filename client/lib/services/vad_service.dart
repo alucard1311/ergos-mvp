@@ -83,9 +83,11 @@ class VADService {
     await _vadHandler!.startListening(
       model: 'v5',
       frameSamples: 512, // CRITICAL: Required for v5 (32ms frames at 16kHz)
-      positiveSpeechThreshold: 0.5,
-      negativeSpeechThreshold: 0.35,
-      preSpeechPadFrames: 10,
+      positiveSpeechThreshold: 0.6, // Higher = less sensitive to noise (was 0.5)
+      negativeSpeechThreshold: 0.25, // Lower = more tolerant of quiet speech (was 0.35)
+      preSpeechPadFrames: 15, // More context before speech (was 10)
+      redemptionFrames: 45, // Allow ~1.4s pause before speech_end (45 * 32ms, was 24)
+      minSpeechFrames: 5, // Require 5 frames (~160ms) of speech to trigger start
     );
     print('VAD: Started listening');
   }

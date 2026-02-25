@@ -62,6 +62,9 @@ class Server:
         # Create and start the pipeline
         self._pipeline = await create_pipeline(self.config)
 
+        # Pre-load all AI models to eliminate first-request latency
+        await self._pipeline.preload_models()
+
         # Create aiohttp runner and site
         self._runner = web.AppRunner(self._pipeline.app)
         await self._runner.setup()

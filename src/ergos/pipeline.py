@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import logging
 from dataclasses import dataclass
 from typing import Optional
@@ -15,8 +16,9 @@ from ergos.config import Config
 from ergos.metrics import LatencyTracker
 from ergos.llm.generator import LLMGenerator
 from ergos.llm.processor import LLMProcessor
+from ergos.plugins import PluginManager
 from ergos.persona.loader import DEFAULT_PERSONA, load_persona
-from ergos.state import ConversationStateMachine
+from ergos.state import ConversationStateMachine, ConversationState
 from ergos.stt.processor import STTProcessor
 from ergos.stt.transcriber import WhisperTranscriber
 from ergos.transport.audio_track import TTSAudioTrack
@@ -47,7 +49,53 @@ class Pipeline:
     connection_manager: ConnectionManager
     data_handler: DataChannelHandler
     latency_tracker: LatencyTracker
+    plugin_manager: PluginManager
     app: web.Application
+
+    async def preload_models(self) -> None:
+        """Pre-load all AI models to eliminate first-request latency.
+
+        Call this during server startup, before accepting connections.
+        Models are loaded in parallel where possible.
+        """
+        import concurrent.futures
+
+        logger.info("Pre-loading AI models...")
+
+        # Load models in thread pool to not block event loop
+        loop = asyncio.get_event_loop()
+        with concurrent.futures.ThreadPoolExecutor(max_workers=3) as executor:
+            # Submit all model loading tasks
+            futures = []
+
+            # STT model (Whisper)
+            futures.append(
+                loop.run_in_executor(
+                    executor,
+                    self.stt_processor.transcriber._ensure_model
+                )
+            )
+
+            # LLM model (llama.cpp)
+            futures.append(
+                loop.run_in_executor(
+                    executor,
+                    self.llm_processor.generator._ensure_model
+                )
+            )
+
+            # TTS model (Kokoro)
+            futures.append(
+                loop.run_in_executor(
+                    executor,
+                    self.tts_processor.synthesizer._ensure_model
+                )
+            )
+
+            # Wait for all to complete
+            await asyncio.gather(*futures)
+
+        logger.info("All AI models pre-loaded successfully")
 
 
 async def create_pipeline(config: Config) -> Pipeline:
@@ -139,10 +187,11 @@ async def create_pipeline(config: Config) -> Pipeline:
         )
 
     # 5. Instantiate TTS components
-    # Note: TTS requires model files - these paths should be in config in future
+    import os
+    tts_model_dir = os.path.expanduser("~/.ergos/models/tts")
     tts_synthesizer = TTSSynthesizer(
-        model_path="kokoro-v1.0.onnx",
-        voices_path="voices-v1.0.bin",
+        model_path=os.path.join(tts_model_dir, "kokoro-v1.0.onnx"),
+        voices_path=os.path.join(tts_model_dir, "voices-v1.0.bin"),
     )
     tts_processor = TTSProcessor(synthesizer=tts_synthesizer)
     logger.debug("Created TTS processor")
@@ -162,13 +211,40 @@ async def create_pipeline(config: Config) -> Pipeline:
     latency_tracker = LatencyTracker()
     logger.debug("Created latency tracker")
 
+    # 9. Create plugin manager and discover plugins
+    plugin_manager = PluginManager()
+    plugin_manager.discover_plugins()
+    logger.debug(f"Discovered {len(plugin_manager.plugins)} plugins")
+
     # ========== Wire callbacks ==========
 
     # Register state change broadcast via data channels
     state_machine.add_callback(data_handler.get_state_callback())
     logger.debug("Wired: state machine -> data channel broadcast")
 
-    # Register STT processor as VAD event listener
+    # Register state machine transitions for VAD events FIRST
+    # (must happen before STT processing to ensure correct state)
+    async def on_vad_for_state(event: VADEvent) -> None:
+        """Trigger state machine transitions on VAD events.
+
+        Only processes VAD events in IDLE or LISTENING states.
+        Ignores VAD during PROCESSING and SPEAKING to prevent interruptions.
+        """
+        current_state = state_machine.state
+        # Only handle VAD events when in IDLE or LISTENING state
+        if current_state not in (ConversationState.IDLE, ConversationState.LISTENING):
+            logger.debug(f"Ignoring VAD event {event.type.value} in state {current_state.value}")
+            return
+
+        if event.type == VADEventType.SPEECH_START:
+            await state_machine.start_listening()
+        elif event.type == VADEventType.SPEECH_END:
+            await state_machine.start_processing()
+
+    vad_processor.add_callback(on_vad_for_state)
+    logger.debug("Wired: VAD -> state machine transitions (ignores during processing/speaking)")
+
+    # Register STT processor as VAD event listener (after state transition)
     vad_processor.add_callback(stt_processor.on_vad_event)
     logger.debug("Wired: VAD -> STT processor")
 
@@ -181,60 +257,324 @@ async def create_pipeline(config: Config) -> Pipeline:
     vad_processor.add_callback(on_vad_for_latency)
     logger.debug("Wired: VAD -> latency tracker (speech_end)")
 
-    # Register LLM processor as STT transcription callback
-    stt_processor.add_transcription_callback(llm_processor.process_transcription)
-    logger.debug("Wired: STT -> LLM processor")
-
     # Register TTS processor as LLM token callback
     llm_processor.add_token_callback(tts_processor.receive_token)
     logger.debug("Wired: LLM -> TTS processor")
 
+    # Register completion callback to flush TTS buffer after LLM finishes
+    async def on_llm_complete(result) -> None:
+        """Flush TTS buffer and wait for audio to finish before transitioning state."""
+        logger.info(f"LLM completed: {len(result.text)} chars, {result.tokens_generated} tokens")
+        await tts_processor.flush()
+
+        # Wait for TTS synthesis to complete (in case flush triggered synthesis)
+        max_wait = 30.0
+        elapsed = 0.0
+        while tts_processor.is_synthesizing and elapsed < max_wait:
+            await asyncio.sleep(0.1)
+            elapsed += 0.1
+
+        # Now wait for audio to actually play out
+        # The audio is buffered in tracks - wait for buffer to drain
+        # Use a combination of checking track buffers and a timeout based on audio duration
+        audio_duration_s = tts_processor.total_audio_duration_ms / 1000.0
+        logger.info(f"TTS generated {tts_processor.total_audio_duration_ms:.0f}ms of audio, waiting for playback")
+
+        # Wait for track buffers to drain
+        max_wait_seconds = max(audio_duration_s + 5.0, 30.0)  # At least audio duration + buffer
+        check_interval = 0.2
+        elapsed = 0.0
+
+        while elapsed < max_wait_seconds:
+            has_audio = False
+            for pc in list(connection_manager._connections):
+                track = connection_manager.get_track(pc)
+                if track is not None and track.has_audio:
+                    has_audio = True
+                    buffer_ms = track.buffer_duration_ms
+                    logger.debug(f"Track buffer: {buffer_ms:.0f}ms remaining")
+                    break
+
+            if not has_audio:
+                logger.info("Audio buffers drained, transitioning to IDLE")
+                break
+
+            await asyncio.sleep(check_interval)
+            elapsed += check_interval
+
+        if elapsed >= max_wait_seconds:
+            logger.warning(f"Timeout ({max_wait_seconds:.1f}s) waiting for audio to drain")
+
+        # Reset audio tracking for next utterance
+        tts_processor.reset_audio_tracking()
+
+        # Transition back to IDLE after speaking completes
+        await state_machine.stop()
+
+    llm_processor.add_completion_callback(on_llm_complete)
+    logger.debug("Wired: LLM completion -> TTS flush + state IDLE")
+
     # Create audio output callback that pushes to all TTSAudioTracks
+    _first_audio_sent = [False]  # Track if we've sent first audio chunk
+
     async def on_tts_audio(samples: np.ndarray, sample_rate: int) -> None:
         """Push TTS audio samples to all connected WebRTC tracks.
 
         Also marks first audio for latency tracking on the first chunk
-        after speech_end.
+        after speech_end, and transitions state to SPEAKING.
+
+        IMPORTANT: Only pushes audio if state allows (PROCESSING or SPEAKING).
+        If user interrupts (barge-in), state changes to LISTENING and audio
+        is discarded to avoid segfaults from concurrent audio streams.
         """
+        current_state = state_machine.state
+
+        # Only push audio if we're in a state that expects TTS output
+        # PROCESSING: waiting for first audio (will transition to SPEAKING)
+        # SPEAKING: actively playing TTS audio
+        if current_state not in (ConversationState.PROCESSING, ConversationState.SPEAKING):
+            logger.debug(
+                f"TTS audio discarded: state is {current_state.value}, not PROCESSING/SPEAKING"
+            )
+            return
+
+        logger.debug(
+            f"TTS audio callback: {len(samples)} samples at {sample_rate}Hz, "
+            f"dtype={samples.dtype}, range=[{samples.min():.4f}, {samples.max():.4f}]"
+        )
+
         # Mark first audio for latency tracking
         if latency_tracker.is_waiting_for_audio:
             latency_tracker.mark_first_audio()
             latency_tracker.log_current()
             latency_tracker.reset()
 
-        for pc in list(connection_manager._connections):
+        # Transition to SPEAKING on first audio chunk
+        if not _first_audio_sent[0]:
+            _first_audio_sent[0] = True
+            success = await state_machine.start_speaking()
+            if not success:
+                logger.warning("Failed to transition to SPEAKING, discarding audio")
+                return
+
+        # Double-check state after transition attempt (could have changed)
+        if state_machine.state != ConversationState.SPEAKING:
+            logger.debug(
+                f"State changed during transition, discarding audio "
+                f"(state={state_machine.state.value})"
+            )
+            return
+
+        connections = list(connection_manager._connections)
+        logger.debug(f"Pushing audio to {len(connections)} connections")
+        for pc in connections:
             track = connection_manager.get_track(pc)
             if track is not None:
-                track.push_audio(samples)
+                track.push_audio(samples, sample_rate)
+            else:
+                logger.warning(f"No track found for connection {pc}")
+
+    # Reset flags when entering PROCESSING state (for each new response)
+    async def on_vad_reset_flags(event: VADEvent) -> None:
+        current_state = state_machine.state
+
+        # Reset on speech_start if we're able to listen
+        if event.type == VADEventType.SPEECH_START:
+            if current_state in (ConversationState.IDLE, ConversationState.LISTENING):
+                # Reset TTS cancellation so new response can be synthesized
+                tts_processor.reset_cancellation()
+
+        # Always reset _first_audio_sent when speech ends (entering PROCESSING)
+        # This ensures the next TTS response triggers SPEAKING transition
+        if event.type == VADEventType.SPEECH_END:
+            _first_audio_sent[0] = False
+            logger.debug("Reset _first_audio_sent flag for new response")
+
+    vad_processor.add_callback(on_vad_reset_flags)
 
     tts_processor.add_audio_callback(on_tts_audio)
     logger.debug("Wired: TTS -> WebRTC audio tracks (with latency tracking)")
 
-    # Register TTS buffer clear as barge-in callback
-    async def on_barge_in() -> None:
-        """Clear TTS buffer on barge-in."""
-        tts_processor.clear_buffer()
-        # Also clear audio queues in all tracks
-        for pc in list(connection_manager._connections):
-            track = connection_manager.get_track(pc)
-            if track is not None:
-                track.clear()
+    # DISABLED: Barge-in cancellation - let responses complete fully
+    # async def on_barge_in() -> None:
+    #     """Cancel LLM generation, TTS synthesis, and clear buffers on barge-in."""
+    #     generator.cancel()
+    #     await tts_processor.cancel()
+    #     for pc in list(connection_manager._connections):
+    #         track = connection_manager.get_track(pc)
+    #         if track is not None:
+    #             track.clear()
+    # state_machine.add_barge_in_callback(on_barge_in)
+    logger.debug("Barge-in disabled - responses will complete fully")
 
-    state_machine.add_barge_in_callback(on_barge_in)
-    logger.debug("Wired: barge-in -> TTS buffer clear")
+    # ========== Plugin Integration ==========
+
+    # Create speak callback for plugins
+    # This allows plugins to speak text via TTS
+    async def plugin_speak_callback(text: str) -> None:
+        """Speak text via TTS for plugins.
+
+        Feeds text to TTS processor and handles state transitions.
+        """
+        logger.info(f"Plugin speaking: {text[:50]}...")
+
+        # Transition to PROCESSING state first (required for TTS audio to be accepted)
+        current_state = state_machine.state
+        if current_state == ConversationState.IDLE:
+            await state_machine.start_listening()
+            await state_machine.start_processing()
+        elif current_state == ConversationState.LISTENING:
+            await state_machine.start_processing()
+
+        # Reset TTS state for new utterance
+        tts_processor.reset_cancellation()
+        tts_processor.clear_buffer()
+        _first_audio_sent[0] = False
+
+        # Feed text to TTS (it will synthesize on sentence boundaries)
+        for char in text:
+            await tts_processor.receive_token(char)
+
+        # Flush remaining text
+        await tts_processor.flush()
+
+        # Wait for synthesis to complete
+        max_wait = 30.0
+        elapsed = 0.0
+        while tts_processor.is_synthesizing and elapsed < max_wait:
+            await asyncio.sleep(0.1)
+            elapsed += 0.1
+
+        # Wait for audio to play out
+        audio_duration_s = tts_processor.total_audio_duration_ms / 1000.0
+        max_wait_seconds = max(audio_duration_s + 2.0, 10.0)
+        check_interval = 0.2
+        elapsed = 0.0
+
+        while elapsed < max_wait_seconds:
+            has_audio = False
+            for pc in list(connection_manager._connections):
+                track = connection_manager.get_track(pc)
+                if track is not None and track.has_audio:
+                    has_audio = True
+                    break
+
+            if not has_audio:
+                break
+
+            await asyncio.sleep(check_interval)
+            elapsed += check_interval
+
+        # Reset for next utterance
+        tts_processor.reset_audio_tracking()
+
+        # Return to IDLE state
+        await state_machine.stop()
+
+    # Attach plugins to Ergos components
+    plugin_manager.attach_all(
+        llm=llm_processor.generator,
+        tts=tts_processor,
+        state_machine=state_machine,
+        speak_callback=plugin_speak_callback,
+    )
+    logger.debug("Attached plugins to Ergos components")
+
+    # Create transcription callback that routes through plugins first
+    async def on_transcription_with_plugins(result) -> None:
+        """Route transcription to plugins or LLM.
+
+        Checks if any plugin should handle the input. If so, routes
+        to the plugin. Otherwise, passes through to LLM processor.
+        """
+        text = result.text
+        logger.info(f"Transcription: {text}")
+
+        # Check if a plugin should handle this
+        plugin = plugin_manager.route_input(text)
+
+        if plugin is not None:
+            logger.info(f"Routing to plugin: {plugin.name}")
+            try:
+                handled = await plugin.handle_input(text)
+                if handled:
+                    logger.debug(f"Plugin {plugin.name} handled input")
+                    return
+                else:
+                    logger.debug(f"Plugin {plugin.name} passed through")
+            except Exception as e:
+                logger.error(f"Plugin error: {e}")
+                # Deactivate plugin on error
+                await plugin_manager.deactivate_current()
+
+        # No plugin handled it, pass to LLM
+        await llm_processor.process_transcription(result)
+
+    # Replace the direct LLM callback with plugin-aware routing
+    # First remove the direct callback, then add the routing callback
+    stt_processor.remove_transcription_callback(llm_processor.process_transcription)
+    stt_processor.add_transcription_callback(on_transcription_with_plugins)
+    logger.debug("Wired: STT -> Plugin router -> LLM processor")
+
+    # Create text input handler for direct text commands (e.g., mode switching)
+    async def on_text_input(text: str) -> None:
+        """Handle direct text input from data channel.
+
+        Routes text to plugins, similar to transcription handling.
+        Used for mode switching commands sent from the Flutter client.
+        """
+        logger.info(f"Text input: {text}")
+
+        # Check if a plugin should handle this
+        plugin = plugin_manager.route_input(text)
+
+        if plugin is not None:
+            logger.info(f"Routing text input to plugin: {plugin.name}")
+            try:
+                handled = await plugin.handle_input(text)
+                if handled:
+                    logger.debug(f"Plugin {plugin.name} handled text input")
+                    return
+                else:
+                    logger.debug(f"Plugin {plugin.name} passed through text input")
+            except Exception as e:
+                logger.error(f"Plugin error on text input: {e}")
+                await plugin_manager.deactivate_current()
+
+        # No plugin handled it - for text input, we just log and ignore
+        # (unlike transcription, we don't pass unhandled text to LLM)
+        logger.debug("Text input not handled by any plugin")
+
+    # Wire text input callback to data handler
+    data_handler.set_text_input_callback(on_text_input)
+    logger.debug("Wired: Data channel text input -> Plugin router")
 
     # Create on_incoming_audio callback to bridge WebRTC audio to STT
     # This keeps a sequence counter for AudioChunk creation
     _audio_sequence = [0]  # Use list to allow modification in closure
 
     async def on_incoming_audio(samples: np.ndarray, sample_rate: int) -> None:
-        """Route incoming WebRTC audio to STT pipeline."""
+        """Route incoming WebRTC audio to STT pipeline.
+
+        Only processes audio in IDLE or LISTENING states.
+        Ignores audio during PROCESSING and SPEAKING to prevent interference.
+        """
+        # Only listen when in IDLE or LISTENING state
+        current_state = state_machine.state
+        if current_state not in (ConversationState.IDLE, ConversationState.LISTENING):
+            # Silently ignore audio during processing/speaking
+            return
+
+        logger.debug(f"Incoming audio: {len(samples)} samples, rate={sample_rate}, dtype={samples.dtype}, range=[{samples.min():.4f}, {samples.max():.4f}]")
+
+        # Pass raw audio to STT at original sample rate
+        # STT processor will resample once after accumulating all audio
+        # This avoids resampling artifacts from processing small chunks independently
+
         # Convert samples to bytes (int16 format expected by STT)
-        if samples.dtype == np.float32:
-            # Convert from float32 [-1, 1] to int16
-            int_samples = (samples * 32767).astype(np.int16)
-        else:
-            int_samples = samples.astype(np.int16)
+        int_samples = np.clip(samples, -32768, 32767).astype(np.int16)
+
+        logger.debug(f"Int16 range: [{int_samples.min()}, {int_samples.max()}]")
 
         audio_bytes = int_samples.tobytes()
 
@@ -273,5 +613,6 @@ async def create_pipeline(config: Config) -> Pipeline:
         connection_manager=connection_manager,
         data_handler=data_handler,
         latency_tracker=latency_tracker,
+        plugin_manager=plugin_manager,
         app=app,
     )
