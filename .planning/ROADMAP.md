@@ -154,7 +154,10 @@
   3. All models (STT ~1GB, LLM ~5.2GB, TTS ~0.5GB) load simultaneously without OOM errors
   4. VRAM monitor reports total usage under 12GB with all models active
   5. Existing voice conversation flow works end-to-end with new model stack
-**Plans**: TBD
+**Plans**: 2 plans
+Plans:
+- [ ] 13-01-PLAN.md — VRAM orchestration infrastructure + STT upgrade to small.en INT8
+- [ ] 13-02-PLAN.md — LLM upgrade to Qwen3-8B chatml + VRAM integration + concurrent loading verification
 
 #### Phase 14: Full-Duplex Conversation
 **Goal**: Users can talk and interrupt naturally — zero awkward silences, sub-300ms response, barge-in within 200ms
@@ -239,7 +242,7 @@ Phases execute in numeric order: 13 → 14 → 15 → 16 → 17 → 18 → 19
 | 10. Flutter Client UI | v1.0 | 2/2 | Complete | 2026-01-26 |
 | 11. Flutter Client Platform | v1.0 | 1/1 | Complete | 2026-01-26 |
 | 12. Integration & Latency | v1.0 | 3/3 | Complete | 2026-01-26 |
-| 13. Model Upgrade & VRAM Orchestration | v2.0 | 0/? | Not started | - |
+| 13. Model Upgrade & VRAM Orchestration | v2.0 | 0/2 | Planning complete | - |
 | 14. Full-Duplex Conversation | v2.0 | 0/? | Not started | - |
 | 15. Expressive Voice | v2.0 | 0/? | Not started | - |
 | 16. TARS Personality | v2.0 | 0/? | Not started | - |
