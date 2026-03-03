@@ -19,6 +19,7 @@ class STTConfig(BaseModel):
 
     model: str = "base"  # whisper model size
     device: str = "auto"  # auto, cuda, cpu
+    compute_type: str = "auto"  # float32, float16, int8, auto
 
 
 class LLMConfig(BaseModel):
@@ -28,6 +29,8 @@ class LLMConfig(BaseModel):
     context_length: int = 4096
     max_tokens: int = 512
     device: str = "auto"
+    chat_format: str = "chatml"  # Chat template format: chatml (Qwen3), llama-3, etc.
+    n_gpu_layers: int = -1  # GPU layers to offload: -1 means all layers
 
 
 class TTSConfig(BaseModel):

@@ -132,6 +132,7 @@ async def create_pipeline(config: Config) -> Pipeline:
     transcriber = WhisperTranscriber(
         model_size=config.stt.model,
         device=config.stt.device,
+        compute_type=config.stt.compute_type,
     )
     stt_processor = STTProcessor(transcriber=transcriber)
     logger.debug("Created STT processor")

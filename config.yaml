@@ -1,8 +1,10 @@
 llm:
-  context_length: 1024
+  chat_format: chatml
+  context_length: 4096
   device: auto
   max_tokens: 256
   model_path: ~/.ergos/models/Phi-3-mini-4k-instruct-q4.gguf
+  n_gpu_layers: -1
 persona:
   name: Ergos
   persona_file: null
@@ -11,8 +13,9 @@ server:
   host: 0.0.0.0
   port: 8765
 stt:
+  compute_type: int8
   device: auto
-  model: tiny.en
+  model: small.en
 tts:
   device: auto
   speed: 1.0
