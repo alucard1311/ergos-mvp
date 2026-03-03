@@ -27,18 +27,22 @@ class LLMGenerator:
         model_path: str,
         n_ctx: int = 2048,
         n_gpu_layers: int = -1,
+        chat_format: str = "chatml",
     ) -> None:
         """Initialize generator with model path and config.
 
         Args:
             model_path: Path to the GGUF model file.
-            n_ctx: Context window size (default 2048 for Phi-3 Mini).
+            n_ctx: Context window size (default 2048).
             n_gpu_layers: Number of layers to offload to GPU (-1 = all).
+            chat_format: Chat template format to use ("chatml" for Qwen3,
+                         "phi3" for Phi-3 legacy). Default is "chatml".
         """
         import os
         self._model_path = os.path.expanduser(model_path)
         self._n_ctx = n_ctx
         self._n_gpu_layers = n_gpu_layers
+        self._chat_format = chat_format
         self._model: Optional[Llama] = None
         self._executor = ThreadPoolExecutor(max_workers=1)
         # Lock to prevent concurrent access to llama_cpp model
@@ -166,6 +170,15 @@ class LLMGenerator:
                 yield token
             except queue.Empty:
                 await asyncio.sleep(0.01)
+
+    @property
+    def chat_format(self) -> str:
+        """Get the configured chat format.
+
+        Returns:
+            The chat format string (e.g., "chatml", "phi3").
+        """
+        return self._chat_format
 
     @property
     def model_loaded(self) -> bool:

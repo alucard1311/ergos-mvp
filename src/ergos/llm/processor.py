@@ -8,7 +8,7 @@ from typing import Awaitable, Callable
 from ergos.stt.types import TranscriptionResult
 
 from .generator import LLMGenerator
-from .types import CompletionResult, TokenCallback
+from .types import CompletionResult, GenerationConfig, TokenCallback
 
 logger = logging.getLogger(__name__)
 
@@ -26,8 +26,9 @@ class Message:
 class LLMProcessor:
     """Processor for LLM-based conversation with history and streaming.
 
-    Manages conversation history, builds prompts in Phi-3 chat format,
-    and streams response tokens to registered callbacks.
+    Manages conversation history, builds prompts in the configured chat format
+    (chatml for Qwen3 or phi3 for legacy Phi-3), and streams response tokens
+    to registered callbacks.
     """
 
     generator: LLMGenerator
@@ -38,6 +39,7 @@ class LLMProcessor:
     # Configuration
     max_history_messages: int = 10  # Keep last N messages for context
     max_context_tokens: int = 1500  # Reserve tokens for history
+    chat_format: str = "chatml"     # Chat template format: "chatml" (Qwen3) or "phi3" (legacy)
 
     # Internal state (not init parameters)
     _history: list[Message] = field(default_factory=list, init=False)
@@ -63,11 +65,16 @@ class LLMProcessor:
         # Build prompt with history
         prompt = self._build_prompt()
 
+        # Build generation config with format-appropriate stop sequences
+        gen_config = GenerationConfig(
+            stop_sequences=self._get_stop_sequences(),
+        )
+
         # Generate response with streaming
         full_response = ""
         tokens_generated = 0
 
-        async for token in self.generator.generate_stream(prompt):
+        async for token in self.generator.generate_stream(prompt, config=gen_config):
             full_response += token
             tokens_generated += 1
             for callback in self._token_callbacks:
@@ -104,13 +111,44 @@ class LLMProcessor:
     def _build_prompt(self) -> str:
         """Build prompt with system message and conversation history.
 
-        Uses Phi-3 chat format:
-        <|system|>\\n{system_prompt}<|end|>\\n
-        <|user|>\\n{user_msg}<|end|>\\n
-        <|assistant|>\\n
+        Supports two chat formats:
+        - chatml (Qwen3): Uses <|im_start|>/<|im_end|> tokens
+          <|im_start|>system\\n{system_prompt}<|im_end|>\\n
+          <|im_start|>user\\n{msg}<|im_end|>\\n
+          <|im_start|>assistant\\n
+        - phi3 (legacy Phi-3): Uses <|system|>/<|user|>/<|end|> tokens
+          <|system|>\\n{system_prompt}<|end|>\\n
+          <|user|>\\n{msg}<|end|>\\n
+          <|assistant|>\\n
 
         Returns:
             Formatted prompt string.
+        """
+        if self.chat_format == "chatml":
+            return self._build_chatml_prompt()
+        else:
+            return self._build_phi3_prompt()
+
+    def _build_chatml_prompt(self) -> str:
+        """Build prompt in chatml format (Qwen3).
+
+        Returns:
+            Formatted chatml prompt string.
+        """
+        parts = [f"<|im_start|>system\n{self.system_prompt}<|im_end|>"]
+
+        for msg in self._history[-self.max_history_messages :]:
+            role = "user" if msg.role == "user" else "assistant"
+            parts.append(f"<|im_start|>{role}\n{msg.content}<|im_end|>")
+
+        parts.append("<|im_start|>assistant\n")
+        return "\n".join(parts)
+
+    def _build_phi3_prompt(self) -> str:
+        """Build prompt in Phi-3 format (legacy).
+
+        Returns:
+            Formatted Phi-3 prompt string.
         """
         parts = [f"<|system|>\n{self.system_prompt}<|end|>"]
 
@@ -120,6 +158,17 @@ class LLMProcessor:
 
         parts.append("<|assistant|>\n")
         return "\n".join(parts)
+
+    def _get_stop_sequences(self) -> list[str]:
+        """Return stop sequences appropriate for the current chat format.
+
+        Returns:
+            List of stop token strings.
+        """
+        if self.chat_format == "chatml":
+            return ["<|im_end|>", "<|endoftext|>"]
+        else:
+            return ["<|end|>"]
 
     def _trim_history(self) -> None:
         """Keep history within bounds."""

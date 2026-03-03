@@ -177,7 +177,6 @@ class TestLLMProcessorChatFormat:
         from ergos.stt.types import TranscriptionResult
         result = TranscriptionResult(
             text="Hello there",
-            confidence=1.0,
             language="en",
         )
 
