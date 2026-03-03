@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v2.0
 milestone_name: TARS
 status: planning
-stopped_at: Completed 13-model-upgrade-vram-orchestration 13-01-PLAN.md
-last_updated: "2026-03-03T21:34:49.729Z"
+stopped_at: Completed 13-model-upgrade-vram-orchestration 13-02-PLAN.md
+last_updated: "2026-03-03T21:41:45.782Z"
 last_activity: 2026-03-03 — v2.0 roadmap created, phases 13-19 defined
 progress:
   total_phases: 19
-  completed_phases: 12
+  completed_phases: 13
   total_plans: 28
-  completed_plans: 27
+  completed_plans: 28
   percent: 96
 ---
 
@@ -55,6 +55,9 @@ v2-relevant decisions:
 - Cascaded pipeline retained (text intermediary enables tool-calling and debugging)
 - [Phase 13-model-upgrade-vram-orchestration]: VRAMMonitor uses torch.cuda.mem_get_info() with None fallback for zero-dep CPU compatibility
 - [Phase 13-model-upgrade-vram-orchestration]: STT upgraded to faster-whisper small.en INT8 (~1GB VRAM) in config.yaml for v2 accuracy
+- [Phase 13-model-upgrade-vram-orchestration]: chatml is default chat_format for LLMGenerator and LLMProcessor — Qwen3 works out of the box
+- [Phase 13-model-upgrade-vram-orchestration]: Phi-3 format preserved as backward-compatible fallback via chat_format='phi3'
+- [Phase 13-model-upgrade-vram-orchestration]: VRAM registration hardcoded at pipeline creation: STT=1000MB, LLM=5200MB, TTS=500MB — known estimates, no dynamic file scanning
 
 ### Pending Todos
 
@@ -66,6 +69,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-03T21:34:49.727Z
-Stopped at: Completed 13-model-upgrade-vram-orchestration 13-01-PLAN.md
+Last session: 2026-03-03T21:41:45.780Z
+Stopped at: Completed 13-model-upgrade-vram-orchestration 13-02-PLAN.md
 Resume file: None
