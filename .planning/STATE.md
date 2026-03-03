@@ -5,16 +5,16 @@
 See: .planning/PROJECT.md (updated 2026-03-03)
 
 **Core value:** Complete privacy through local-only processing
-**Current focus:** Milestone v2.0 TARS — Defining requirements
+**Current focus:** Milestone v2.0 TARS — Phase 13: Model Upgrade & VRAM Orchestration
 
 ## Current Position
 
-Phase: Not started (defining requirements)
-Plan: —
-Status: Defining requirements
-Last activity: 2026-03-03 — Milestone v2.0 started
+Phase: 13 of 19 (Model Upgrade & VRAM Orchestration)
+Plan: 0 of ? in current phase
+Status: Ready to plan
+Last activity: 2026-03-03 — v2.0 roadmap created, phases 13-19 defined
 
-Progress: ░░░░░░░░░░░░░░░░░░░░░░░░░░ 0%
+Progress: ████████████░░░░░░░░░░░░░░ 46% (v1 complete, v2 starting)
 
 ## v1 Performance Metrics (archived)
 
@@ -30,12 +30,13 @@ Progress: ░░░░░░░░░░░░░░░░░░░░░░░�
 Decisions are logged in PROJECT.md Key Decisions table.
 v2-relevant decisions:
 
-- Cascaded pipeline over E2E for agentic tool-calling support
-- Qwen3 family for LLM (best tool-calling F1 in 16GB VRAM)
-- Evolve existing Ergos pipeline (architecturally sound, mirrors Pipecat)
-- Moondream 2B for vision (1.5GB VRAM, strong UI localization)
-- TARS personality with configurable sarcasm level
-- All models must fit concurrently in 16GB VRAM (~11.2GB total)
+- Phase 13: Qwen3-8B Q4_K_M (~5.2GB) as LLM upgrade — best tool-calling F1 in 16GB VRAM budget
+- Phase 13: STT upgrade to faster-whisper small.en INT8 (~1GB) for accuracy improvement
+- Phase 13: ARCH-01 (VRAM orchestration) co-located with model upgrades — prerequisite for all v2 models
+- Phase 15: Kokoro-82M ONNX stays as base TTS; Orpheus is upgrade path for emotion/expressiveness
+- Phase 18: Moondream 2B INT8 (~1.5GB) for vision — strong UI localization, Pipecat-compatible
+- All models must fit concurrently: ~11.2GB of 16GB VRAM (~4.8GB headroom for KV cache)
+- Cascaded pipeline retained (text intermediary enables tool-calling and debugging)
 
 ### Pending Todos
 
@@ -48,5 +49,5 @@ None yet.
 ## Session Continuity
 
 Last session: 2026-03-03
-Stopped at: Milestone v2.0 started, defining requirements
+Stopped at: v2.0 roadmap created — 7 phases (13-19), 19/19 requirements mapped
 Resume file: None

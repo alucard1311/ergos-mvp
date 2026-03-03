@@ -175,36 +175,35 @@ Deferred to future release. Tracked but not in current roadmap.
 | CLIENT-PLATFORM-01 | Phase 11 | Complete |
 | CLIENT-PLATFORM-02 | Phase 11 | Complete |
 
-### v2.0 (Phases 13+) — Pending
+### v2.0 (Phases 13-19) — Pending
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| VOICE-01 | TBD | Pending |
-| VOICE-02 | TBD | Pending |
-| VOICE-03 | TBD | Pending |
-| VOICE-04 | TBD | Pending |
-| PERS-01 | TBD | Pending |
-| PERS-02 | TBD | Pending |
-| PERS-03 | TBD | Pending |
-| MODEL-01 | TBD | Pending |
-| MODEL-02 | TBD | Pending |
-| MODEL-03 | TBD | Pending |
-| AGENT-01 | TBD | Pending |
-| AGENT-02 | TBD | Pending |
-| AGENT-03 | TBD | Pending |
-| AGENT-04 | TBD | Pending |
-| VIS-01 | TBD | Pending |
-| VIS-02 | TBD | Pending |
-| VIS-03 | TBD | Pending |
-| ARCH-01 | TBD | Pending |
-| ARCH-02 | TBD | Pending |
+| MODEL-01 | Phase 13 | Pending |
+| MODEL-02 | Phase 13 | Pending |
+| MODEL-03 | Phase 13 | Pending |
+| ARCH-01 | Phase 13 | Pending |
+| VOICE-01 | Phase 14 | Pending |
+| VOICE-02 | Phase 14 | Pending |
+| VOICE-03 | Phase 14 | Pending |
+| VOICE-04 | Phase 15 | Pending |
+| PERS-01 | Phase 16 | Pending |
+| PERS-02 | Phase 16 | Pending |
+| PERS-03 | Phase 16 | Pending |
+| AGENT-01 | Phase 17 | Pending |
+| AGENT-02 | Phase 17 | Pending |
+| AGENT-03 | Phase 17 | Pending |
+| AGENT-04 | Phase 17 | Pending |
+| VIS-01 | Phase 18 | Pending |
+| VIS-02 | Phase 18 | Pending |
+| VIS-03 | Phase 18 | Pending |
+| ARCH-02 | Phase 19 | Pending |
 
 **Coverage:**
 - v1 requirements: 34 total — 34 mapped ✓
-- v2.0 requirements: 19 total
-- Mapped to phases: 0
-- Unmapped: 19 ⚠️
+- v2.0 requirements: 19 total — 19 mapped ✓
+- Unmapped: 0 ✓
 
 ---
 *Requirements defined: 2026-01-26*
-*Last updated: 2026-03-03 after v2.0 milestone definition*
+*Last updated: 2026-03-03 — v2.0 phase mappings added (phases 13-19)*
