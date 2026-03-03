@@ -7,6 +7,11 @@ from typing import Optional
 
 logger = logging.getLogger(__name__)
 
+try:
+    import torch
+except ImportError:
+    torch = None  # type: ignore[assignment]
+
 
 @dataclass
 class GPUInfo:
@@ -26,6 +31,33 @@ class HardwareInfo:
     python_version: str
     gpu: GPUInfo
     recommended_device: str  # "cuda" or "cpu"
+
+
+def get_vram_usage() -> tuple[float, float]:
+    """Query current GPU VRAM usage.
+
+    Returns:
+        Tuple of (used_mb, total_mb). Returns (0.0, 0.0) when no GPU
+        is available or when torch is not installed.
+    """
+    if torch is None:
+        logger.debug("torch not available, returning zero VRAM usage")
+        return (0.0, 0.0)
+
+    try:
+        if not torch.cuda.is_available():
+            logger.debug("CUDA not available, returning zero VRAM usage")
+            return (0.0, 0.0)
+
+        # mem_get_info returns (free_bytes, total_bytes)
+        free_bytes, total_bytes = torch.cuda.mem_get_info()
+        total_mb = total_bytes / (1024 * 1024)
+        free_mb = free_bytes / (1024 * 1024)
+        used_mb = total_mb - free_mb
+        return (used_mb, total_mb)
+    except Exception as e:
+        logger.warning("Failed to query VRAM usage: %s", e)
+        return (0.0, 0.0)
 
 
 def detect_gpu() -> GPUInfo:

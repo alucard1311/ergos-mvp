@@ -244,13 +244,10 @@ class TestGetVramUsage:
 
     def test_get_vram_usage_no_torch(self):
         """get_vram_usage() returns (0.0, 0.0) when torch is not installed."""
-        import ergos.hardware as hw_module
-        original_torch = getattr(hw_module, "torch", None)
+        from ergos.hardware import get_vram_usage
 
-        with patch.dict("sys.modules", {"torch": None}):
-            # Re-test via a direct call with mocked import
-            with patch("ergos.hardware.torch", None):
-                used_mb, total_mb = get_vram_usage()
+        with patch("ergos.hardware.torch", None):
+            used_mb, total_mb = get_vram_usage()
 
         assert used_mb == 0.0
         assert total_mb == 0.0
