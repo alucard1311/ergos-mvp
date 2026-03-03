@@ -65,6 +65,15 @@ class Server:
         # Pre-load all AI models to eliminate first-request latency
         await self._pipeline.preload_models()
 
+        # Log VRAM report with per-model breakdown
+        vram_report = self._pipeline.vram_monitor.report()
+        logger.info("VRAM model estimates:")
+        for name, profile in vram_report["models"].items():
+            logger.info(
+                f"  [{profile['category'].upper()}] {name}: ~{profile['estimated_mb']:.0f}MB"
+            )
+        logger.info(f"  Total estimated: ~{vram_report['total_estimated_mb']:.0f}MB")
+
         # Create aiohttp runner and site
         self._runner = web.AppRunner(self._pipeline.app)
         await self._runner.setup()

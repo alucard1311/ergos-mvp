@@ -3,7 +3,7 @@ llm:
   context_length: 4096
   device: auto
   max_tokens: 256
-  model_path: ~/.ergos/models/Phi-3-mini-4k-instruct-q4.gguf
+  model_path: ~/.ergos/models/Qwen3-8B-Q4_K_M.gguf
   n_gpu_layers: -1
 persona:
   name: Ergos

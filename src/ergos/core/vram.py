@@ -162,7 +162,9 @@ class VRAMMonitor:
               - total_estimated_mb: Sum of all registered model estimates
               - available_mb: Effective budget after subtracting headroom
         """
-        total_estimated = sum(p.estimated_mb for p in self._models.values())
+        total_estimated = sum(
+            (p.estimated_mb for p in self._models.values()), 0.0
+        )
         available = self._vram_budget_mb - headroom_mb
         fits = total_estimated <= available
         return fits, total_estimated, available
@@ -178,7 +180,9 @@ class VRAMMonitor:
               - "total_estimated_mb": sum of all registered model estimates
         """
         snap = self.snapshot()
-        total_estimated = sum(p.estimated_mb for p in self._models.values())
+        total_estimated = sum(
+            (p.estimated_mb for p in self._models.values()), 0.0
+        )
 
         return {
             "models": {

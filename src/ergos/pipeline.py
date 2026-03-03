@@ -13,6 +13,7 @@ from aiohttp import web
 from ergos.audio.types import AudioChunk, AudioFrame
 from ergos.audio.vad import VADProcessor, VADEvent, VADEventType
 from ergos.config import Config
+from ergos.core.vram import VRAMMonitor
 from ergos.metrics import LatencyTracker
 from ergos.llm.generator import LLMGenerator
 from ergos.llm.processor import LLMProcessor
@@ -51,6 +52,7 @@ class Pipeline:
     latency_tracker: LatencyTracker
     plugin_manager: PluginManager
     app: web.Application
+    vram_monitor: VRAMMonitor
 
     async def preload_models(self) -> None:
         """Pre-load all AI models to eliminate first-request latency.
@@ -59,6 +61,19 @@ class Pipeline:
         Models are loaded in parallel where possible.
         """
         import concurrent.futures
+
+        # Log VRAM budget info before loading
+        fits, total_est, available = self.vram_monitor.budget_check()
+        if fits:
+            logger.info(
+                f"VRAM budget OK: ~{total_est:.0f}MB estimated, "
+                f"{available:.0f}MB available (budget - headroom)"
+            )
+        else:
+            logger.warning(
+                f"VRAM budget exceeded: ~{total_est:.0f}MB estimated but only "
+                f"{available:.0f}MB available — may cause OOM errors"
+            )
 
         logger.info("Pre-loading AI models...")
 
@@ -97,6 +112,16 @@ class Pipeline:
 
         logger.info("All AI models pre-loaded successfully")
 
+        # Log actual VRAM usage after loading
+        snap = self.vram_monitor.snapshot()
+        if snap.total_mb > 0:
+            logger.info(
+                f"GPU VRAM: {snap.used_mb:.0f}MB / {snap.total_mb:.0f}MB "
+                f"({snap.utilization_pct:.1f}% utilization)"
+            )
+        else:
+            logger.info("GPU VRAM: not available (CPU mode or torch not installed)")
+
 
 async def create_pipeline(config: Config) -> Pipeline:
     """Create and wire all pipeline components.
@@ -119,6 +144,15 @@ async def create_pipeline(config: Config) -> Pipeline:
         A fully wired Pipeline ready to process voice interactions.
     """
     logger.info("Creating voice pipeline...")
+
+    # 0. Create VRAM monitor and register all v2 models with estimates
+    vram_monitor = VRAMMonitor()
+    vram_monitor.register_model("faster-whisper-small.en", 1000.0, "stt")
+    vram_monitor.register_model("qwen3-8b-q4", 5200.0, "llm")
+    vram_monitor.register_model("kokoro-82m", 500.0, "tts")
+    logger.debug(
+        "Created VRAM monitor with model estimates: STT=1000MB, LLM=5200MB, TTS=500MB"
+    )
 
     # 1. Instantiate state machine
     state_machine = ConversationStateMachine()
@@ -168,10 +202,13 @@ async def create_pipeline(config: Config) -> Pipeline:
         generator = LLMGenerator(
             model_path=config.llm.model_path,
             n_ctx=config.llm.context_length,
+            n_gpu_layers=config.llm.n_gpu_layers,
+            chat_format=config.llm.chat_format,
         )
         llm_processor = LLMProcessor(
             generator=generator,
             system_prompt=system_prompt,
+            chat_format=config.llm.chat_format,
         )
         logger.debug("Created LLM processor")
     else:
@@ -181,10 +218,13 @@ async def create_pipeline(config: Config) -> Pipeline:
         generator = LLMGenerator(
             model_path="",  # Will fail on first use if called
             n_ctx=config.llm.context_length,
+            n_gpu_layers=config.llm.n_gpu_layers,
+            chat_format=config.llm.chat_format,
         )
         llm_processor = LLMProcessor(
             generator=generator,
             system_prompt=system_prompt,
+            chat_format=config.llm.chat_format,
         )
 
     # 5. Instantiate TTS components
@@ -616,4 +656,5 @@ async def create_pipeline(config: Config) -> Pipeline:
         latency_tracker=latency_tracker,
         plugin_manager=plugin_manager,
         app=app,
+        vram_monitor=vram_monitor,
     )
