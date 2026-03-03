@@ -3,109 +3,140 @@
 **Defined:** 2026-01-26
 **Core Value:** Complete privacy through local-only processing
 
-## v1 Requirements
+## v1 Requirements (Complete)
 
-Requirements for initial release. Each maps to roadmap phases.
+All v1 requirements shipped in phases 1-12. See v1 traceability below.
 
 ### Audio Infrastructure (Server)
-
-- [ ] **AUDIO-01**: Server receives audio stream from client
-- [ ] **AUDIO-02**: Server sends audio stream to client
-- [ ] **AUDIO-03**: Server processes VAD events from client
+- [x] **AUDIO-01**: Server receives audio stream from client
+- [x] **AUDIO-02**: Server sends audio stream to client
+- [x] **AUDIO-03**: Server processes VAD events from client
 
 ### Speech-to-Text (Server)
-
 - [x] **STT-01**: Server transcribes speech to text using faster-whisper
 - [x] **STT-02**: Server streams partial transcriptions as speech is recognized
 - [x] **STT-03**: Server uses VAD boundaries for transcription segments
 
 ### LLM (Server)
-
 - [x] **LLM-01**: Server generates responses using Phi-3 Mini (3.8B) via llama-cpp-python
 - [x] **LLM-02**: Server streams tokens to TTS as they are generated
 - [x] **LLM-03**: Server manages context/memory within <8GB RAM target
 
 ### Text-to-Speech (Server)
-
 - [x] **TTS-01**: Server synthesizes speech using Kokoro ONNX
 - [x] **TTS-02**: Server streams audio output as synthesis progresses
 - [x] **TTS-03**: Server chunks responses at sentence boundaries
 
 ### State Machine (Server)
-
 - [x] **STATE-01**: Server implements IDLE → LISTENING → PROCESSING → SPEAKING state machine
 - [x] **STATE-02**: Server broadcasts state changes to client
 - [x] **STATE-03**: Server handles barge-in (stops TTS, clears buffers)
 
 ### Transport (Server)
-
-- [ ] **TRANSPORT-01**: Server runs WebRTC signaling endpoint
-- [ ] **TRANSPORT-02**: Server uses data channel for VAD/state messages
-- [ ] **TRANSPORT-03**: Server uses Opus codec for audio
+- [x] **TRANSPORT-01**: Server runs WebRTC signaling endpoint
+- [x] **TRANSPORT-02**: Server uses data channel for VAD/state messages
+- [x] **TRANSPORT-03**: Server uses Opus codec for audio
 
 ### CLI / Configuration (Server)
-
-- [ ] **CLI-01**: User can start server via CLI
-- [ ] **CLI-02**: User can stop server via CLI
-- [ ] **CLI-03**: User can check server status via CLI
-- [ ] **CONFIG-01**: Server loads configuration from YAML
-- [ ] **CONFIG-02**: Server auto-detects hardware (GPU)
+- [x] **CLI-01**: User can start server via CLI
+- [x] **CLI-02**: User can stop server via CLI
+- [x] **CLI-03**: User can check server status via CLI
+- [x] **CONFIG-01**: Server loads configuration from YAML
+- [x] **CONFIG-02**: Server auto-detects hardware (GPU)
 - [x] **PERSONA-01**: Server loads persona from YAML
 - [x] **PERSONA-02**: Server generates behavior based on persona
 
 ### Flutter Client - Audio
-
-- [ ] **CLIENT-AUDIO-01**: App captures audio from phone microphone
-- [ ] **CLIENT-AUDIO-02**: App plays audio through phone speaker
-- [ ] **CLIENT-AUDIO-03**: App performs client-side VAD
-- [ ] **CLIENT-AUDIO-04**: App establishes WebRTC connection to server
+- [x] **CLIENT-AUDIO-01**: App captures audio from phone microphone
+- [x] **CLIENT-AUDIO-02**: App plays audio through phone speaker
+- [x] **CLIENT-AUDIO-03**: App performs client-side VAD
+- [x] **CLIENT-AUDIO-04**: App establishes WebRTC connection to server
 
 ### Flutter Client - UI
-
-- [ ] **CLIENT-UI-01**: App displays animated 3D ball that pulses when speaking
-- [ ] **CLIENT-UI-02**: App ball visual changes to reflect state (IDLE/LISTENING/PROCESSING/SPEAKING)
-- [ ] **CLIENT-UI-03**: App supports barge-in gesture/control to interrupt AI
+- [x] **CLIENT-UI-01**: App displays animated 3D ball that pulses when speaking
+- [x] **CLIENT-UI-02**: App ball visual changes to reflect state
+- [x] **CLIENT-UI-03**: App supports barge-in gesture/control to interrupt AI
 
 ### Flutter Client - Platform
+- [x] **CLIENT-PLATFORM-01**: App runs on Android
+- [x] **CLIENT-PLATFORM-02**: App runs on iOS
 
-- [ ] **CLIENT-PLATFORM-01**: App runs on Android
-- [ ] **CLIENT-PLATFORM-02**: App runs on iOS
+## v2.0 Requirements
 
-## v2 Requirements
+Requirements for TARS milestone. Each maps to roadmap phases (13+).
+
+### Voice Experience
+
+- [ ] **VOICE-01**: User experiences zero awkward silence — sub-300ms from speech end to first AI audio
+- [ ] **VOICE-02**: User can talk while AI is speaking (full-duplex, SPEAKING_AND_LISTENING state)
+- [ ] **VOICE-03**: User can interrupt mid-sentence and AI stops within 200ms
+- [ ] **VOICE-04**: AI voice has natural prosody with emotion, pauses, and timed delivery for sarcasm
+
+### Personality
+
+- [ ] **PERS-01**: AI has TARS-like dry wit with configurable sarcasm level (0-100%)
+- [ ] **PERS-02**: AI makes context-aware jokes referencing current activity and past conversations
+- [ ] **PERS-03**: AI remembers conversation history, user preferences, and running jokes across sessions
+
+### Model Upgrade
+
+- [ ] **MODEL-01**: LLM upgraded from Phi-3 Mini to Qwen3-8B (or Qwen3.5-9B) with native tool-calling
+- [ ] **MODEL-02**: STT upgraded from Whisper tiny.en to small.en INT8 for better accuracy
+- [ ] **MODEL-03**: All models load concurrently and fit within 16GB VRAM budget
+
+### Agentic Execution
+
+- [ ] **AGENT-01**: AI can call tools (file operations, shell commands, web search) via LLM function calling
+- [ ] **AGENT-02**: AI narrates what it's doing during tool execution ("Let me check that...")
+- [ ] **AGENT-03**: AI can chain multiple tools to complete multi-step workflows
+- [ ] **AGENT-04**: Tool registry allows adding new tools without code changes
+
+### Vision
+
+- [ ] **VIS-01**: User can ask "what's on my screen" and AI describes/analyzes the current screen
+- [ ] **VIS-02**: AI can read and summarize documents, PDFs, and images
+- [ ] **VIS-03**: AI can interact with UI elements — click buttons, fill forms, navigate apps
+
+### Architecture
+
+- [ ] **ARCH-01**: VRAM orchestration manages concurrent model loading within 16GB budget
+- [ ] **ARCH-02**: Optional cloud LLM fallback with explicit user consent per-query
+
+## v3 Requirements
 
 Deferred to future release. Tracked but not in current roadmap.
 
-### Audio
+### Wake Word
+- **WAKE-01**: User can activate assistant with a wake word without touching a button
 
-- **AUDIO-04**: Echo cancellation
+### Multi-language
+- **LANG-01**: User can converse in languages other than English
 
-### Features
+### Smart Home
+- **HOME-01**: User can control smart home devices via voice commands
 
-- **WAKE-01**: Wake word activation
-- **MULTI-LANG-01**: Multi-language support
-- **HOME-01**: Smart home integration
+### Client
 - **CLIENT-PLATFORM-03**: Web (Flutter web) support
 - **CLIENT-UI-04**: Settings screen
 
 ## Out of Scope
 
-Explicitly excluded. Documented to prevent scope creep.
-
 | Feature | Reason |
 |---------|--------|
-| Wake word detection | Adds complexity, v2 feature |
-| Multi-user support | Single user focus for v1 |
-| Smart home integrations | Separate project concern |
-| Multi-language | English only for v1 |
-| Cloud/hybrid mode | Contradicts core value |
+| Multi-user support | Single user focus, personal assistant |
+| Cloud-only mode | Contradicts core value of local-only privacy |
+| Custom voice cloning | Complexity, defer to v3+ |
+| Real-time translation | English only for v2 |
+| Mobile-first redesign | Desktop/laptop primary for v2 (vision, screen control) |
 
 ## Development Notes
 
-- **Mobile development:** Use mobile-mcp server (https://github.com/mobile-next/mobile-mcp) for Flutter client development assistance
+- **Mobile development:** Use mobile-mcp server for Flutter client development assistance
+- **v2 research:** See `memory/v2-research.md` for model choices, architecture, framework analysis
 
 ## Traceability
 
-Which phases cover which requirements. Updated by create-roadmap.
+### v1 (Phases 1-12) — Complete
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
@@ -131,24 +162,49 @@ Which phases cover which requirements. Updated by create-roadmap.
 | TTS-03 | Phase 6 | Complete |
 | PERSONA-01 | Phase 7 | Complete |
 | PERSONA-02 | Phase 7 | Complete |
-| TRANSPORT-01 | Phase 8 | Pending |
-| TRANSPORT-02 | Phase 8 | Pending |
-| TRANSPORT-03 | Phase 8 | Pending |
-| CLIENT-AUDIO-01 | Phase 9 | Pending |
-| CLIENT-AUDIO-02 | Phase 9 | Pending |
-| CLIENT-AUDIO-03 | Phase 9 | Pending |
-| CLIENT-AUDIO-04 | Phase 9 | Pending |
+| TRANSPORT-01 | Phase 8 | Complete |
+| TRANSPORT-02 | Phase 8 | Complete |
+| TRANSPORT-03 | Phase 8 | Complete |
+| CLIENT-AUDIO-01 | Phase 9 | Complete |
+| CLIENT-AUDIO-02 | Phase 9 | Complete |
+| CLIENT-AUDIO-03 | Phase 9 | Complete |
+| CLIENT-AUDIO-04 | Phase 9 | Complete |
 | CLIENT-UI-01 | Phase 10 | Complete |
 | CLIENT-UI-02 | Phase 10 | Complete |
 | CLIENT-UI-03 | Phase 10 | Complete |
 | CLIENT-PLATFORM-01 | Phase 11 | Complete |
 | CLIENT-PLATFORM-02 | Phase 11 | Complete |
 
+### v2.0 (Phases 13+) — Pending
+
+| Requirement | Phase | Status |
+|-------------|-------|--------|
+| VOICE-01 | TBD | Pending |
+| VOICE-02 | TBD | Pending |
+| VOICE-03 | TBD | Pending |
+| VOICE-04 | TBD | Pending |
+| PERS-01 | TBD | Pending |
+| PERS-02 | TBD | Pending |
+| PERS-03 | TBD | Pending |
+| MODEL-01 | TBD | Pending |
+| MODEL-02 | TBD | Pending |
+| MODEL-03 | TBD | Pending |
+| AGENT-01 | TBD | Pending |
+| AGENT-02 | TBD | Pending |
+| AGENT-03 | TBD | Pending |
+| AGENT-04 | TBD | Pending |
+| VIS-01 | TBD | Pending |
+| VIS-02 | TBD | Pending |
+| VIS-03 | TBD | Pending |
+| ARCH-01 | TBD | Pending |
+| ARCH-02 | TBD | Pending |
+
 **Coverage:**
-- v1 requirements: 34 total
-- Mapped to phases: 34
-- Unmapped: 0 ✓
+- v1 requirements: 34 total — 34 mapped ✓
+- v2.0 requirements: 19 total
+- Mapped to phases: 0
+- Unmapped: 19 ⚠️
 
 ---
 *Requirements defined: 2026-01-26*
-*Last updated: 2026-01-26 after Phase 11 completion*
+*Last updated: 2026-03-03 after v2.0 milestone definition*
