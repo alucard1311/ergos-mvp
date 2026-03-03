@@ -81,7 +81,7 @@ Requirements for TARS milestone. Each maps to roadmap phases (13+).
 ### Model Upgrade
 
 - [ ] **MODEL-01**: LLM upgraded from Phi-3 Mini to Qwen3-8B (or Qwen3.5-9B) with native tool-calling
-- [ ] **MODEL-02**: STT upgraded from Whisper tiny.en to small.en INT8 for better accuracy
+- [x] **MODEL-02**: STT upgraded from Whisper tiny.en to small.en INT8 for better accuracy
 - [ ] **MODEL-03**: All models load concurrently and fit within 16GB VRAM budget
 
 ### Agentic Execution
@@ -99,7 +99,7 @@ Requirements for TARS milestone. Each maps to roadmap phases (13+).
 
 ### Architecture
 
-- [ ] **ARCH-01**: VRAM orchestration manages concurrent model loading within 16GB budget
+- [x] **ARCH-01**: VRAM orchestration manages concurrent model loading within 16GB budget
 - [ ] **ARCH-02**: Optional cloud LLM fallback with explicit user consent per-query
 
 ## v3 Requirements
@@ -180,9 +180,9 @@ Deferred to future release. Tracked but not in current roadmap.
 | Requirement | Phase | Status |
 |-------------|-------|--------|
 | MODEL-01 | Phase 13 | Pending |
-| MODEL-02 | Phase 13 | Pending |
+| MODEL-02 | Phase 13 | Complete |
 | MODEL-03 | Phase 13 | Pending |
-| ARCH-01 | Phase 13 | Pending |
+| ARCH-01 | Phase 13 | Complete |
 | VOICE-01 | Phase 14 | Pending |
 | VOICE-02 | Phase 14 | Pending |
 | VOICE-03 | Phase 14 | Pending |

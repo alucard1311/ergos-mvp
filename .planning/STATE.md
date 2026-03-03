@@ -1,3 +1,19 @@
+---
+gsd_state_version: 1.0
+milestone: v2.0
+milestone_name: TARS
+status: planning
+stopped_at: Completed 13-model-upgrade-vram-orchestration 13-01-PLAN.md
+last_updated: "2026-03-03T21:34:49.729Z"
+last_activity: 2026-03-03 — v2.0 roadmap created, phases 13-19 defined
+progress:
+  total_phases: 19
+  completed_phases: 12
+  total_plans: 28
+  completed_plans: 27
+  percent: 96
+---
+
 # Project State
 
 ## Project Reference
@@ -14,7 +30,7 @@ Plan: 0 of ? in current phase
 Status: Ready to plan
 Last activity: 2026-03-03 — v2.0 roadmap created, phases 13-19 defined
 
-Progress: ████████████░░░░░░░░░░░░░░ 46% (v1 complete, v2 starting)
+Progress: [██████████] 96%
 
 ## v1 Performance Metrics (archived)
 
@@ -37,6 +53,8 @@ v2-relevant decisions:
 - Phase 18: Moondream 2B INT8 (~1.5GB) for vision — strong UI localization, Pipecat-compatible
 - All models must fit concurrently: ~11.2GB of 16GB VRAM (~4.8GB headroom for KV cache)
 - Cascaded pipeline retained (text intermediary enables tool-calling and debugging)
+- [Phase 13-model-upgrade-vram-orchestration]: VRAMMonitor uses torch.cuda.mem_get_info() with None fallback for zero-dep CPU compatibility
+- [Phase 13-model-upgrade-vram-orchestration]: STT upgraded to faster-whisper small.en INT8 (~1GB VRAM) in config.yaml for v2 accuracy
 
 ### Pending Todos
 
@@ -48,6 +66,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-03
-Stopped at: v2.0 roadmap created — 7 phases (13-19), 19/19 requirements mapped
+Last session: 2026-03-03T21:34:49.727Z
+Stopped at: Completed 13-model-upgrade-vram-orchestration 13-01-PLAN.md
 Resume file: None

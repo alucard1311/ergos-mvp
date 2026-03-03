@@ -242,7 +242,7 @@ Phases execute in numeric order: 13 → 14 → 15 → 16 → 17 → 18 → 19
 | 10. Flutter Client UI | v1.0 | 2/2 | Complete | 2026-01-26 |
 | 11. Flutter Client Platform | v1.0 | 1/1 | Complete | 2026-01-26 |
 | 12. Integration & Latency | v1.0 | 3/3 | Complete | 2026-01-26 |
-| 13. Model Upgrade & VRAM Orchestration | v2.0 | 0/2 | Planning complete | - |
+| 13. Model Upgrade & VRAM Orchestration | 1/2 | In Progress|  | - |
 | 14. Full-Duplex Conversation | v2.0 | 0/? | Not started | - |
 | 15. Expressive Voice | v2.0 | 0/? | Not started | - |
 | 16. TARS Personality | v2.0 | 0/? | Not started | - |
