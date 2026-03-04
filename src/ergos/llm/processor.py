@@ -180,6 +180,15 @@ class LLMProcessor:
         if len(self._history) > self.max_history_messages * 2:
             self._history = self._history[-self.max_history_messages :]
 
+    def update_system_prompt(self, new_prompt: str) -> None:
+        """Update system prompt at runtime (e.g., when sarcasm level changes).
+
+        Args:
+            new_prompt: The new system prompt string.
+        """
+        self.system_prompt = new_prompt
+        logger.info("LLM: System prompt updated")
+
     def clear_history(self) -> None:
         """Clear conversation history."""
         self._history.clear()
