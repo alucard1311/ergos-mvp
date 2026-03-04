@@ -196,7 +196,11 @@ Plans:
   2. AI makes jokes that reference what the user is currently doing (screen context or recent conversation topic)
   3. AI recalls a user preference or running joke from a previous session without being re-told
   4. TARS persona loads from configuration and overrides default system prompt behavior
-**Plans**: TBD
+**Plans**: 3 plans
+Plans:
+- [ ] 16-01-PLAN.md — TARS persona + prompt builder + config extensions + sarcasm command + tests
+- [ ] 16-02-PLAN.md — Memory store + extraction logic + types + tests
+- [ ] 16-03-PLAN.md — Pipeline wiring: prompt builder, memory, sarcasm intercept, disconnect extraction
 
 #### Phase 17: Agentic Execution
 **Goal**: AI executes multi-step workflows using tools, narrates its actions, and accepts new tools without code changes
@@ -252,7 +256,7 @@ Phases execute in numeric order: 13 → 14 → 15 → 16 → 17 → 18 → 19
 | 13. Model Upgrade & VRAM Orchestration | v2.0 | 2/2 | Complete | 2026-03-03 |
 | 14. Full-Duplex Conversation | v2.0 | 3/3 | Complete | 2026-03-04 |
 | 15. Expressive Voice | v2.0 | Complete    | 2026-03-04 | 2026-03-04 |
-| 16. TARS Personality | v2.0 | 0/? | Not started | - |
+| 16. TARS Personality | v2.0 | 0/3 | Not started | - |
 | 17. Agentic Execution | v2.0 | 0/? | Not started | - |
 | 18. Vision | v2.0 | 0/? | Not started | - |
 | 19. Cloud Fallback | v2.0 | 0/? | Not started | - |
