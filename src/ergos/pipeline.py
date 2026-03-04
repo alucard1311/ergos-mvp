@@ -27,7 +27,7 @@ from ergos.transport.connection import ConnectionManager
 from ergos.transport.data_channel import DataChannelHandler
 from ergos.transport.signaling import create_signaling_app
 from ergos.tts.processor import TTSProcessor
-from ergos.tts.synthesizer import TTSSynthesizer
+from ergos.tts.synthesizer import KokoroSynthesizer
 
 logger = logging.getLogger(__name__)
 
@@ -149,9 +149,10 @@ async def create_pipeline(config: Config) -> Pipeline:
     vram_monitor = VRAMMonitor()
     vram_monitor.register_model("faster-whisper-small.en", 1000.0, "stt")
     vram_monitor.register_model("qwen3-8b-q4", 5200.0, "llm")
-    vram_monitor.register_model("kokoro-82m", 500.0, "tts")
+    if config.tts.engine != "csm":
+        vram_monitor.register_model("kokoro-82m", 500.0, "tts")
     logger.debug(
-        "Created VRAM monitor with model estimates: STT=1000MB, LLM=5200MB, TTS=500MB"
+        "Created VRAM monitor with model estimates: STT=1000MB, LLM=5200MB"
     )
 
     # 1. Instantiate state machine
@@ -229,11 +230,22 @@ async def create_pipeline(config: Config) -> Pipeline:
 
     # 5. Instantiate TTS components
     import os
-    tts_model_dir = os.path.expanduser("~/.ergos/models/tts")
-    tts_synthesizer = TTSSynthesizer(
-        model_path=os.path.join(tts_model_dir, "kokoro-v1.0.onnx"),
-        voices_path=os.path.join(tts_model_dir, "voices-v1.0.bin"),
-    )
+    if config.tts.engine == "csm":
+        from ergos.tts.csm_synthesizer import CSMSynthesizer
+        tts_synthesizer = CSMSynthesizer(
+            model_id=config.tts.model_id,
+            device=config.tts.device,
+            reference_audio=config.tts.reference_audio,
+        )
+        vram_monitor.register_model("csm-1b", 4500.0, "tts")
+        logger.debug("Created CSM-1B TTS synthesizer")
+    else:
+        tts_model_dir = os.path.expanduser("~/.ergos/models/tts")
+        tts_synthesizer = KokoroSynthesizer(
+            model_path=os.path.join(tts_model_dir, "kokoro-v1.0.onnx"),
+            voices_path=os.path.join(tts_model_dir, "voices-v1.0.bin"),
+        )
+        logger.debug("Created Kokoro TTS synthesizer")
     tts_processor = TTSProcessor(synthesizer=tts_synthesizer)
     logger.debug("Created TTS processor")
 
@@ -265,25 +277,67 @@ async def create_pipeline(config: Config) -> Pipeline:
 
     # Register state machine transitions for VAD events FIRST
     # (must happen before STT processing to ensure correct state)
+    _overlap_timer_task: list[Optional[asyncio.Task]] = [None]  # Track overlap timer for cancellation
+
     async def on_vad_for_state(event: VADEvent) -> None:
         """Trigger state machine transitions on VAD events.
 
-        Only processes VAD events in IDLE or LISTENING states.
-        Ignores VAD during PROCESSING and SPEAKING to prevent interruptions.
+        Handles full-duplex: when SPEECH_START fires during SPEAKING,
+        transitions to SPEAKING_AND_LISTENING with a 500ms overlap window.
+        When SPEECH_END fires during SPEAKING_AND_LISTENING, executes
+        barge-in immediately and transitions to PROCESSING.
         """
         current_state = state_machine.state
-        # Only handle VAD events when in IDLE or LISTENING state
-        if current_state not in (ConversationState.IDLE, ConversationState.LISTENING):
-            logger.debug(f"Ignoring VAD event {event.type.value} in state {current_state.value}")
-            return
 
         if event.type == VADEventType.SPEECH_START:
-            await state_machine.start_listening()
+            if current_state in (ConversationState.IDLE, ConversationState.LISTENING):
+                await state_machine.start_listening()
+
+            elif current_state == ConversationState.SPEAKING:
+                # Transition to full-duplex overlap state
+                # AI audio continues for ~500ms overlap window
+                success = await state_machine.transition_to(
+                    ConversationState.SPEAKING_AND_LISTENING,
+                    metadata={"trigger": "speech_start_during_speaking"}
+                )
+                if success:
+                    # Schedule barge-in after 500ms overlap window
+                    # If SPEECH_END fires before timer, timer is cancelled
+                    async def _overlap_timeout():
+                        await asyncio.sleep(0.5)
+                        if state_machine.state == ConversationState.SPEAKING_AND_LISTENING:
+                            logger.info("Overlap timeout: executing barge-in after 500ms")
+                            await state_machine.barge_in()
+                            await state_machine.start_processing()
+
+                    _overlap_timer_task[0] = asyncio.create_task(_overlap_timeout())
+                    logger.debug("SPEAKING_AND_LISTENING: 500ms overlap timer started")
+
+            elif current_state == ConversationState.SPEAKING_AND_LISTENING:
+                # Already in overlap state, ignore additional SPEECH_START
+                logger.debug("Ignoring SPEECH_START: already in SPEAKING_AND_LISTENING")
+
+            else:
+                logger.debug(f"Ignoring SPEECH_START in state {current_state.value}")
+
         elif event.type == VADEventType.SPEECH_END:
-            await state_machine.start_processing()
+            # Cancel overlap timer if pending (SPEECH_END fires before 500ms)
+            if _overlap_timer_task[0] is not None and not _overlap_timer_task[0].done():
+                _overlap_timer_task[0].cancel()
+                _overlap_timer_task[0] = None
+                logger.debug("SPEAKING_AND_LISTENING: overlap timer cancelled by SPEECH_END")
+
+            if current_state == ConversationState.SPEAKING_AND_LISTENING:
+                # User finished speaking during overlap — execute barge-in now
+                await state_machine.barge_in()  # Cancels LLM+TTS, transitions to LISTENING
+                await state_machine.start_processing()
+                logger.info("Barge-in complete: SPEAKING_AND_LISTENING -> PROCESSING")
+
+            elif current_state in (ConversationState.LISTENING,):
+                await state_machine.start_processing()
 
     vad_processor.add_callback(on_vad_for_state)
-    logger.debug("Wired: VAD -> state machine transitions (ignores during processing/speaking)")
+    logger.debug("Wired: VAD -> state machine transitions (full-duplex with SPEAKING_AND_LISTENING)")
 
     # Register STT processor as VAD event listener (after state transition)
     vad_processor.add_callback(stt_processor.on_vad_event)
@@ -373,9 +427,10 @@ async def create_pipeline(config: Config) -> Pipeline:
         # Only push audio if we're in a state that expects TTS output
         # PROCESSING: waiting for first audio (will transition to SPEAKING)
         # SPEAKING: actively playing TTS audio
-        if current_state not in (ConversationState.PROCESSING, ConversationState.SPEAKING):
+        # SPEAKING_AND_LISTENING: overlap window — TTS audio continues while user speaks
+        if current_state not in (ConversationState.PROCESSING, ConversationState.SPEAKING, ConversationState.SPEAKING_AND_LISTENING):
             logger.debug(
-                f"TTS audio discarded: state is {current_state.value}, not PROCESSING/SPEAKING"
+                f"TTS audio discarded: state is {current_state.value}, not PROCESSING/SPEAKING/SPEAKING_AND_LISTENING"
             )
             return
 
@@ -399,7 +454,7 @@ async def create_pipeline(config: Config) -> Pipeline:
                 return
 
         # Double-check state after transition attempt (could have changed)
-        if state_machine.state != ConversationState.SPEAKING:
+        if state_machine.state not in (ConversationState.SPEAKING, ConversationState.SPEAKING_AND_LISTENING):
             logger.debug(
                 f"State changed during transition, discarding audio "
                 f"(state={state_machine.state.value})"
@@ -421,8 +476,9 @@ async def create_pipeline(config: Config) -> Pipeline:
 
         # Reset on speech_start if we're able to listen
         if event.type == VADEventType.SPEECH_START:
-            if current_state in (ConversationState.IDLE, ConversationState.LISTENING):
+            if current_state in (ConversationState.IDLE, ConversationState.LISTENING, ConversationState.SPEAKING_AND_LISTENING):
                 # Reset TTS cancellation so new response can be synthesized
+                # SPEAKING_AND_LISTENING: reset needed for post-barge-in response (Pitfall 2 + Pattern 6)
                 tts_processor.reset_cancellation()
 
         # Always reset _first_audio_sent when speech ends (entering PROCESSING)
@@ -436,17 +492,35 @@ async def create_pipeline(config: Config) -> Pipeline:
     tts_processor.add_audio_callback(on_tts_audio)
     logger.debug("Wired: TTS -> WebRTC audio tracks (with latency tracking)")
 
-    # DISABLED: Barge-in cancellation - let responses complete fully
-    # async def on_barge_in() -> None:
-    #     """Cancel LLM generation, TTS synthesis, and clear buffers on barge-in."""
-    #     generator.cancel()
-    #     await tts_processor.cancel()
-    #     for pc in list(connection_manager._connections):
-    #         track = connection_manager.get_track(pc)
-    #         if track is not None:
-    #             track.clear()
-    # state_machine.add_barge_in_callback(on_barge_in)
-    logger.debug("Barge-in disabled - responses will complete fully")
+    # ========== Barge-in cancellation ==========
+    async def on_barge_in() -> None:
+        """Cancel LLM generation, TTS synthesis, and clear audio buffers on barge-in.
+
+        Called by state_machine.barge_in() before transitioning to LISTENING.
+        Execution order matters: cancel generation flag first, then synthesis,
+        then clear audio buffers to prevent re-queuing.
+        """
+        logger.info("Barge-in: executing cancel sequence")
+
+        # 1. Cancel LLM generation (flag-based, stops at next token check)
+        generator.cancel()
+
+        # 2. Cancel TTS synthesis (flag-based + clears text buffer)
+        await tts_processor.cancel()
+
+        # 3. Reset _first_audio_sent so next response triggers SPEAKING transition
+        _first_audio_sent[0] = False
+
+        # 4. Clear audio track buffers (thread-safe, immediate)
+        for pc in list(connection_manager._connections):
+            track = connection_manager.get_track(pc)
+            if track is not None:
+                track.clear()
+
+        logger.info("Barge-in: cancel sequence complete")
+
+    state_machine.add_barge_in_callback(on_barge_in)
+    logger.debug("Barge-in callback wired: LLM cancel + TTS cancel + track clear")
 
     # ========== Plugin Integration ==========
 
@@ -597,12 +671,13 @@ async def create_pipeline(config: Config) -> Pipeline:
     async def on_incoming_audio(samples: np.ndarray, sample_rate: int) -> None:
         """Route incoming WebRTC audio to STT pipeline.
 
-        Only processes audio in IDLE or LISTENING states.
-        Ignores audio during PROCESSING and SPEAKING to prevent interference.
+        Processes audio in IDLE, LISTENING, or SPEAKING_AND_LISTENING states.
+        SPEAKING_AND_LISTENING: user is speaking while AI is speaking — route to STT
+        for barge-in transcription. Ignores audio during PROCESSING and SPEAKING.
         """
-        # Only listen when in IDLE or LISTENING state
+        # Only listen when in IDLE, LISTENING, or SPEAKING_AND_LISTENING state
         current_state = state_machine.state
-        if current_state not in (ConversationState.IDLE, ConversationState.LISTENING):
+        if current_state not in (ConversationState.IDLE, ConversationState.LISTENING, ConversationState.SPEAKING_AND_LISTENING):
             # Silently ignore audio during processing/speaking
             return
 
