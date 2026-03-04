@@ -8,6 +8,7 @@ import 'orb_painter.dart';
 /// - LISTENING: Blue, gentle pulsing
 /// - PROCESSING: Amber, faster pulsing
 /// - SPEAKING: Green, gentle pulsing (tap to barge-in)
+/// - SPEAKING_AND_LISTENING: Cyan, fast pulsing (tap to barge-in)
 ///
 /// When [isKitchenMode] is true, uses a warmer color palette
 /// with orange/red tones to indicate cooking mode.
@@ -78,6 +79,13 @@ class _ErgosOrbState extends State<ErgosOrb>
       case 'SPEAKING':
         _controller.repeat(reverse: true);
         break;
+      case 'SPEAKING_AND_LISTENING':
+        // Fast pulse: 400ms period to distinguish from SPEAKING (1200ms default)
+        _controller.repeat(
+          reverse: true,
+          period: const Duration(milliseconds: 400),
+        );
+        break;
       default:
         _controller.stop();
         _controller.value = 0.5;
@@ -99,6 +107,8 @@ class _ErgosOrbState extends State<ErgosOrb>
           return const Color(0xFFFFD700); // Golden yellow
         case 'SPEAKING':
           return const Color(0xFF4CAF50); // Chef green
+        case 'SPEAKING_AND_LISTENING':
+          return const Color(0xFF06B6D4); // Cyan (same in kitchen mode for consistency)
         default:
           return const Color(0xFF8B5A2B); // Warm brown
       }
@@ -114,6 +124,8 @@ class _ErgosOrbState extends State<ErgosOrb>
         return const Color(0xFFF59E0B); // Amber
       case 'SPEAKING':
         return const Color(0xFF10B981); // Green
+      case 'SPEAKING_AND_LISTENING':
+        return const Color(0xFF06B6D4); // Cyan — distinct from green (SPEAKING) and blue (LISTENING)
       default:
         return const Color(0xFF6B7280); // Grey
     }
@@ -133,7 +145,9 @@ class _ErgosOrbState extends State<ErgosOrb>
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
-      onTap: widget.serverState == 'SPEAKING' ? widget.onBargeIn : null,
+      onTap: (widget.serverState == 'SPEAKING' || widget.serverState == 'SPEAKING_AND_LISTENING')
+          ? widget.onBargeIn
+          : null,
       behavior: HitTestBehavior.opaque,
       child: AnimatedBuilder(
         animation: _controller,
