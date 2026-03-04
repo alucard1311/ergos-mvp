@@ -68,8 +68,8 @@ Requirements for TARS milestone. Each maps to roadmap phases (13+).
 ### Voice Experience
 
 - [ ] **VOICE-01**: User experiences zero awkward silence — sub-300ms from speech end to first AI audio
-- [ ] **VOICE-02**: User can talk while AI is speaking (full-duplex, SPEAKING_AND_LISTENING state)
-- [ ] **VOICE-03**: User can interrupt mid-sentence and AI stops within 200ms
+- [x] **VOICE-02**: User can talk while AI is speaking (full-duplex, SPEAKING_AND_LISTENING state)
+- [x] **VOICE-03**: User can interrupt mid-sentence and AI stops within 200ms
 - [ ] **VOICE-04**: AI voice has natural prosody with emotion, pauses, and timed delivery for sarcasm
 
 ### Personality
@@ -184,8 +184,8 @@ Deferred to future release. Tracked but not in current roadmap.
 | MODEL-03 | Phase 13 | Complete |
 | ARCH-01 | Phase 13 | Complete |
 | VOICE-01 | Phase 14 | Pending |
-| VOICE-02 | Phase 14 | Pending |
-| VOICE-03 | Phase 14 | Pending |
+| VOICE-02 | Phase 14 | Complete |
+| VOICE-03 | Phase 14 | Complete |
 | VOICE-04 | Phase 15 | Pending |
 | PERS-01 | Phase 16 | Pending |
 | PERS-02 | Phase 16 | Pending |

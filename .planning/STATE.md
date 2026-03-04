@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v2.0
 milestone_name: TARS
 status: planning
-stopped_at: Phase 14 context gathered
-last_updated: "2026-03-04T01:24:35.143Z"
+stopped_at: Completed 14-02-PLAN.md
+last_updated: "2026-03-04T01:55:34.766Z"
 last_activity: 2026-03-03 — v2.0 roadmap created, phases 13-19 defined
 progress:
   total_phases: 19
   completed_phases: 13
-  total_plans: 28
-  completed_plans: 28
+  total_plans: 31
+  completed_plans: 29
   percent: 96
 ---
 
@@ -58,6 +58,8 @@ v2-relevant decisions:
 - [Phase 13-model-upgrade-vram-orchestration]: chatml is default chat_format for LLMGenerator and LLMProcessor — Qwen3 works out of the box
 - [Phase 13-model-upgrade-vram-orchestration]: Phi-3 format preserved as backward-compatible fallback via chat_format='phi3'
 - [Phase 13-model-upgrade-vram-orchestration]: VRAM registration hardcoded at pipeline creation: STT=1000MB, LLM=5200MB, TTS=500MB — known estimates, no dynamic file scanning
+- [Phase 14-full-duplex-conversation]: Flutter state strings are UPPERCASE (ServerState.fromJson calls .toUpperCase()) — all state checks use UPPERCASE including SPEAKING_AND_LISTENING
+- [Phase 14-full-duplex-conversation]: VAD redemptionFrames reduced from 45 to 16 (~512ms) for fast turn-taking per CONTEXT.md locked decision
 
 ### Pending Todos
 
@@ -69,6 +71,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-04T01:24:35.141Z
-Stopped at: Phase 14 context gathered
-Resume file: .planning/phases/14-full-duplex-conversation/14-CONTEXT.md
+Last session: 2026-03-04T01:55:34.765Z
+Stopped at: Completed 14-02-PLAN.md
+Resume file: None
