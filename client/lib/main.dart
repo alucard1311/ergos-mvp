@@ -139,7 +139,7 @@ class _ErgosHomePageState extends State<ErgosHomePage> {
 
   /// Sends barge-in message to interrupt server speech.
   void _sendBargeIn() {
-    if (_serverState == 'SPEAKING') {
+    if (_serverState == 'SPEAKING' || _serverState == 'SPEAKING_AND_LISTENING') {
       _webRTCService.sendDataChannelMessage({
         'type': 'barge_in',
         'timestamp': DateTime.now().millisecondsSinceEpoch / 1000,
@@ -300,7 +300,7 @@ class _ErgosHomePageState extends State<ErgosHomePage> {
                     const SizedBox(height: 24),
                     // Tap hint or kitchen mode hint
                     Text(
-                      _serverState == 'SPEAKING'
+                      (_serverState == 'SPEAKING' || _serverState == 'SPEAKING_AND_LISTENING')
                           ? 'Tap to interrupt'
                           : isKitchenMode && _connectionState == ClientConnectionState.connected
                               ? 'Say "next" to advance steps'

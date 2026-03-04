@@ -86,7 +86,7 @@ class VADService {
       positiveSpeechThreshold: 0.6, // Higher = less sensitive to noise (was 0.5)
       negativeSpeechThreshold: 0.25, // Lower = more tolerant of quiet speech (was 0.35)
       preSpeechPadFrames: 15, // More context before speech (was 10)
-      redemptionFrames: 45, // Allow ~1.4s pause before speech_end (45 * 32ms, was 24)
+      redemptionFrames: 16, // ~512ms pause before speech_end (16 * 32ms) — reduced from 45 (~1.4s) for faster turn-taking
       minSpeechFrames: 5, // Require 5 frames (~160ms) of speech to trigger start
     );
     print('VAD: Started listening');
