@@ -4,6 +4,7 @@ import asyncio
 import logging
 from dataclasses import dataclass, field
 
+from .emotion_markup import EmotionMarkupProcessor
 from .synthesizer import TTSSynthesizer
 from .types import AudioCallback, SynthesisConfig
 
@@ -22,10 +23,15 @@ class TTSProcessor:
     synthesizer: TTSSynthesizer
     config: SynthesisConfig = field(default_factory=SynthesisConfig)
 
+    # TTS engine name — controls emotion markup activation
+    # "orpheus" enables EmotionMarkupProcessor; all others get passthrough
+    engine: str = "kokoro"
+
     # Sentence boundary characters
     sentence_endings: str = ".!?"
 
     # Internal state (not init parameters)
+    _emotion_markup: EmotionMarkupProcessor = field(default_factory=EmotionMarkupProcessor, init=False)
     _buffer: str = field(default="", init=False)
     _audio_callbacks: list[AudioCallback] = field(default_factory=list, init=False)
     _cancelled: bool = field(default=False, init=False)  # Cancellation flag for synthesis
@@ -101,6 +107,9 @@ class TTSProcessor:
             synthesis, this method will stop yielding audio chunks.
             Also handles CancelledError from external task cancellation.
         """
+        # Apply emotion markup preprocessing (Orpheus only; Kokoro/CSM get passthrough)
+        text = self._emotion_markup.process(text, engine=self.engine)
+
         preview = text[:50] + "..." if len(text) > 50 else text
         logger.debug(f"TTS: Synthesizing '{preview}'")
 

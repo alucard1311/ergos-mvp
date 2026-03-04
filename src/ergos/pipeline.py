@@ -267,7 +267,7 @@ async def create_pipeline(config: Config) -> Pipeline:
     if config.tts.engine == "orpheus":
         tts_config.orpheus_voice = config.tts.orpheus_voice
 
-    tts_processor = TTSProcessor(synthesizer=tts_synthesizer, config=tts_config)
+    tts_processor = TTSProcessor(synthesizer=tts_synthesizer, config=tts_config, engine=config.tts.engine)
     logger.debug("Created TTS processor")
 
     # 6. Create connection manager
