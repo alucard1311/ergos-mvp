@@ -36,9 +36,18 @@ class LLMConfig(BaseModel):
 class TTSConfig(BaseModel):
     """Text-to-speech configuration."""
 
-    voice: str = "af_heart"  # Kokoro voice
+    engine: str = "kokoro"  # "kokoro", "csm", or "orpheus"
+    voice: str = "af_heart"  # Kokoro voice ID
     speed: float = 1.0
     device: str = "auto"
+    model_id: str = "sesame/csm-1b"  # HuggingFace model for CSM engine
+    speaker_id: int = 0  # CSM speaker ID
+    temperature: float = 0.9  # CSM/Orpheus sampling temperature
+    top_k: int = 50  # CSM/Orpheus top-k sampling
+    reference_audio: list[str] = []  # Paths to reference audio for voice conditioning
+    # Orpheus engine fields
+    orpheus_voice: str = "tara"  # Orpheus voice ID (tara, leah, jess, leo, dan, mia, zac, zoe)
+    orpheus_n_gpu_layers: int = -1  # GPU layers for Orpheus: -1 means all GPU layers
 
 
 class PersonaConfig(BaseModel):

@@ -35,6 +35,14 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
+csm = [
+    "transformers>=4.52.1",
+    "torchaudio>=2.0",
+    "accelerate>=0.20",
+]
+orpheus = [
+    "orpheus-cpp>=0.0.3",
+]
 dev = [
     "pytest>=7.0",
     "ruff>=0.1.0",

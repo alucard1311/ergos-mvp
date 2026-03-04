@@ -283,8 +283,6 @@ class TestConfigYamlOrpheus:
 
     def test_orpheus_optional_dep_in_pyproject(self):
         """orpheus-cpp is listed as an optional dependency under [orpheus] extra."""
-        import toml  # may not be installed - use raw file parse fallback
-        import re
         with open("/home/vinay/ergos/pyproject.toml") as f:
             content = f.read()
         assert "orpheus" in content

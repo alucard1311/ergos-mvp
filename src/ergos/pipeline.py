@@ -149,7 +149,7 @@ async def create_pipeline(config: Config) -> Pipeline:
     vram_monitor = VRAMMonitor()
     vram_monitor.register_model("faster-whisper-small.en", 1000.0, "stt")
     vram_monitor.register_model("qwen3-8b-q4", 5200.0, "llm")
-    if config.tts.engine != "csm":
+    if config.tts.engine not in ("csm", "orpheus"):
         vram_monitor.register_model("kokoro-82m", 500.0, "tts")
     logger.debug(
         "Created VRAM monitor with model estimates: STT=1000MB, LLM=5200MB"
@@ -230,6 +230,8 @@ async def create_pipeline(config: Config) -> Pipeline:
 
     # 5. Instantiate TTS components
     import os
+    from ergos.tts.types import SynthesisConfig as _SynthesisConfig
+
     if config.tts.engine == "csm":
         from ergos.tts.csm_synthesizer import CSMSynthesizer
         tts_synthesizer = CSMSynthesizer(
@@ -239,14 +241,33 @@ async def create_pipeline(config: Config) -> Pipeline:
         )
         vram_monitor.register_model("csm-1b", 4500.0, "tts")
         logger.debug("Created CSM-1B TTS synthesizer")
+    elif config.tts.engine == "orpheus":
+        from ergos.tts.orpheus_synthesizer import OrpheusSynthesizer
+        tts_synthesizer = OrpheusSynthesizer(
+            n_gpu_layers=config.tts.orpheus_n_gpu_layers,
+            lang="en",
+            verbose=False,
+        )
+        vram_monitor.register_model("orpheus-3b-q4", 2000.0, "tts")
+        logger.debug("Created Orpheus TTS synthesizer")
     else:
+        # Default: Kokoro
         tts_model_dir = os.path.expanduser("~/.ergos/models/tts")
         tts_synthesizer = KokoroSynthesizer(
             model_path=os.path.join(tts_model_dir, "kokoro-v1.0.onnx"),
             voices_path=os.path.join(tts_model_dir, "voices-v1.0.bin"),
         )
         logger.debug("Created Kokoro TTS synthesizer")
-    tts_processor = TTSProcessor(synthesizer=tts_synthesizer)
+
+    # Build SynthesisConfig for TTSProcessor, carrying engine-specific fields
+    tts_config = _SynthesisConfig(
+        voice=config.tts.voice,
+        speed=config.tts.speed,
+    )
+    if config.tts.engine == "orpheus":
+        tts_config.orpheus_voice = config.tts.orpheus_voice
+
+    tts_processor = TTSProcessor(synthesizer=tts_synthesizer, config=tts_config)
     logger.debug("Created TTS processor")
 
     # 6. Create connection manager

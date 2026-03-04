@@ -20,9 +20,14 @@ class SynthesisResult:
 class SynthesisConfig:
     """Configuration for TTS synthesis."""
 
-    voice: str = "af_sarah"  # Voice ID to use
+    voice: str = "af_sarah"  # Voice ID to use (Kokoro)
     speed: float = 1.0  # Speech speed multiplier
     lang: str = "en-us"  # Language code
+    speaker_id: int = 0  # CSM speaker ID (ignored by Kokoro and Orpheus)
+    temperature: float = 0.9  # CSM/Orpheus sampling temperature (ignored by Kokoro)
+    top_k: int = 50  # CSM/Orpheus top-k sampling (ignored by Kokoro)
+    orpheus_voice: str = "tara"  # Orpheus voice ID (ignored by Kokoro/CSM)
+    # Valid Orpheus voices: tara, leah, jess, leo, dan, mia, zac, zoe
 
 
 # Type alias for async audio streaming callback

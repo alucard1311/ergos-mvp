@@ -17,6 +17,14 @@ stt:
   device: auto
   model: small.en
 tts:
+  engine: kokoro
   device: auto
   speed: 1.0
   voice: af_heart
+  model_id: sesame/csm-1b
+  speaker_id: 0
+  temperature: 0.9
+  top_k: 50
+  reference_audio: []
+  orpheus_voice: tara
+  orpheus_n_gpu_layers: -1
