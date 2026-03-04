@@ -256,7 +256,7 @@ Phases execute in numeric order: 13 → 14 → 15 → 16 → 17 → 18 → 19
 | 13. Model Upgrade & VRAM Orchestration | v2.0 | 2/2 | Complete | 2026-03-03 |
 | 14. Full-Duplex Conversation | v2.0 | 3/3 | Complete | 2026-03-04 |
 | 15. Expressive Voice | v2.0 | Complete    | 2026-03-04 | 2026-03-04 |
-| 16. TARS Personality | v2.0 | 0/3 | Not started | - |
+| 16. TARS Personality | 2/3 | In Progress|  | - |
 | 17. Agentic Execution | v2.0 | 0/? | Not started | - |
 | 18. Vision | v2.0 | 0/? | Not started | - |
 | 19. Cloud Fallback | v2.0 | 0/? | Not started | - |

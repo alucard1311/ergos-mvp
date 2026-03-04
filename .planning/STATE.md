@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v2.0
 milestone_name: TARS
 status: completed
-stopped_at: Phase 16 context gathered
-last_updated: "2026-03-04T04:28:55.444Z"
+stopped_at: Completed 16-02-PLAN.md (cross-session memory store)
+last_updated: "2026-03-04T05:08:11.607Z"
 last_activity: 2026-03-04 — Phase 15 Expressive Voice complete (human-verify approved)
 progress:
   total_phases: 19
   completed_phases: 15
-  total_plans: 33
-  completed_plans: 33
+  total_plans: 36
+  completed_plans: 35
   percent: 100
 ---
 
@@ -69,6 +69,12 @@ v2-relevant decisions:
 - [Phase 15-expressive-voice]: EmotionMarkupProcessor: regex r'\*(\w+)\*' with .lower() for case-insensitive hint matching, unknown hints stripped entirely
 - [Phase 15-expressive-voice]: Ellipsis (...) converted to ', ' (comma+space) for Orpheus sarcasm pause timing
 - [Phase 15-expressive-voice]: engine field added to TTSProcessor (default 'kokoro') — controls emotion markup activation, zero regression for existing deployments
+- [Phase 16-tars-personality]: MemoryStore scoring formula: 0.7*norm_timestamp + 0.3*norm_access_count — recency-weighted with frequency boost for pruning
+- [Phase 16-tars-personality]: prune_respects_access_count test uses same-age entries to isolate access_count effect — different timestamps cannot overcome 0.7 recency weight
+- [Phase 16-tars-personality]: MEMORY_PATH = ~/.ergos/memory.json at top level (not under plugins/) — cross-session memory is a core feature
+- [Phase 16-tars-personality]: Section-based sarcasm blending uses two fixed template tiers (NEUTRAL/MAX_SARCASM) — cleaner output than interpolation
+- [Phase 16-tars-personality]: DEFAULT_PERSONA and PersonaConfig.name both changed from 'Ergos' to 'TARS' — TARS is the v2 identity
+- [Phase 16-tars-personality]: try_sarcasm_command() regex uses lookbehind (?<!\w) to capture negative sarcasm values like -10%
 
 ### Pending Todos
 
@@ -80,6 +86,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-04T04:28:55.442Z
-Stopped at: Phase 16 context gathered
-Resume file: .planning/phases/16-tars-personality/16-CONTEXT.md
+Last session: 2026-03-04T05:08:11.606Z
+Stopped at: Completed 16-02-PLAN.md (cross-session memory store)
+Resume file: None

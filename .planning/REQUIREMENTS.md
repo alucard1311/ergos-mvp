@@ -74,9 +74,9 @@ Requirements for TARS milestone. Each maps to roadmap phases (13+).
 
 ### Personality
 
-- [ ] **PERS-01**: AI has TARS-like dry wit with configurable sarcasm level (0-100%)
-- [ ] **PERS-02**: AI makes context-aware jokes referencing current activity and past conversations
-- [ ] **PERS-03**: AI remembers conversation history, user preferences, and running jokes across sessions
+- [x] **PERS-01**: AI has TARS-like dry wit with configurable sarcasm level (0-100%)
+- [x] **PERS-02**: AI makes context-aware jokes referencing current activity and past conversations
+- [x] **PERS-03**: AI remembers conversation history, user preferences, and running jokes across sessions
 
 ### Model Upgrade
 
@@ -187,9 +187,9 @@ Deferred to future release. Tracked but not in current roadmap.
 | VOICE-02 | Phase 14 | Complete |
 | VOICE-03 | Phase 14 | Complete |
 | VOICE-04 | Phase 15 | Complete |
-| PERS-01 | Phase 16 | Pending |
-| PERS-02 | Phase 16 | Pending |
-| PERS-03 | Phase 16 | Pending |
+| PERS-01 | Phase 16 | Complete |
+| PERS-02 | Phase 16 | Complete |
+| PERS-03 | Phase 16 | Complete |
 | AGENT-01 | Phase 17 | Pending |
 | AGENT-02 | Phase 17 | Pending |
 | AGENT-03 | Phase 17 | Pending |
