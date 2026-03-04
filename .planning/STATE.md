@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v2.0
 milestone_name: TARS
 status: planning
-stopped_at: Completed 15-expressive-voice 15-01-PLAN.md
-last_updated: "2026-03-04T03:01:02.831Z"
+stopped_at: "Checkpoint: 15-02 Task 2 human-verify"
+last_updated: "2026-03-04T03:05:41.657Z"
 last_activity: 2026-03-03 — v2.0 roadmap created, phases 13-19 defined
 progress:
   total_phases: 19
-  completed_phases: 14
+  completed_phases: 15
   total_plans: 33
-  completed_plans: 32
+  completed_plans: 33
   percent: 96
 ---
 
@@ -66,6 +66,9 @@ v2-relevant decisions:
 - [Phase 14-full-duplex-conversation]: Idle timeout starts on IDLE state entry via state change callback — 30s after system goes IDLE
 - [Phase 14-full-duplex-conversation]: on_llm_complete barge-in guard checks PROCESSING/SPEAKING/SPEAKING_AND_LISTENING before audio drain
 - [Phase 15-expressive-voice]: OrpheusSynthesizer uses orpheus-cpp lazy loading; registered as [orpheus] optional dep; VRAM 2000MB at Q4_K_M
+- [Phase 15-expressive-voice]: EmotionMarkupProcessor: regex r'\*(\w+)\*' with .lower() for case-insensitive hint matching, unknown hints stripped entirely
+- [Phase 15-expressive-voice]: Ellipsis (...) converted to ', ' (comma+space) for Orpheus sarcasm pause timing
+- [Phase 15-expressive-voice]: engine field added to TTSProcessor (default 'kokoro') — controls emotion markup activation, zero regression for existing deployments
 
 ### Pending Todos
 
@@ -77,6 +80,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-04T03:01:02.829Z
-Stopped at: Completed 15-expressive-voice 15-01-PLAN.md
+Last session: 2026-03-04T03:05:29.868Z
+Stopped at: Checkpoint: 15-02 Task 2 human-verify
 Resume file: None
