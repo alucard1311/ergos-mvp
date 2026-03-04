@@ -25,12 +25,12 @@ See: .planning/PROJECT.md (updated 2026-03-03)
 
 ## Current Position
 
-Phase: 15 of 19 (Expressive Voice) — COMPLETE
-Plan: 2 of 2 in current phase — COMPLETE
-Status: Phase 15 complete, ready to start Phase 16
-Last activity: 2026-03-04 — Phase 15 Expressive Voice complete (human-verify approved)
+Phase: 16 of 19 (TARS Personality) — In Progress
+Plan: 1 of 3 in current phase — COMPLETE (16-01 TARS personality infrastructure)
+Status: Phase 16 in progress; 16-01 complete, 16-02 and 16-03 remaining
+Last activity: 2026-03-04 — Phase 16 Plan 01 complete (TARS personality infrastructure)
 
-Progress: [██████████] 100% (33/33 plans complete across 15 active phases)
+Progress: [██████████] 97% (35/36 plans complete)
 
 ## v1 Performance Metrics (archived)
 
