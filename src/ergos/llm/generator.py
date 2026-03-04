@@ -132,11 +132,15 @@ class LLMGenerator:
         Yields:
             Generated tokens as strings.
         """
+        # Reset cancellation state for new generation
+        # (fixes Pitfall 3: cancel flag stuck after barge-in, silently killing next generation)
+        self._cancelled = False
+        self._generating = True
+
         if config is None:
             config = GenerationConfig()
 
         model = self._ensure_model()
-        loop = asyncio.get_event_loop()
 
         # Queue to pass tokens from thread to async
         import queue
@@ -155,6 +159,8 @@ class LLMGenerator:
                     stream=True,
                 )
                 for chunk in stream:
+                    if self._cancelled:
+                        break
                     token = chunk["choices"][0].get("text", "")
                     if token:
                         token_queue.put(token)
@@ -164,12 +170,20 @@ class LLMGenerator:
         self._executor.submit(run_streaming_generation)
 
         # Yield tokens as they arrive
-        while not generation_done.is_set() or not token_queue.empty():
-            try:
-                token = token_queue.get(timeout=0.05)
-                yield token
-            except queue.Empty:
-                await asyncio.sleep(0.01)
+        try:
+            while not generation_done.is_set() or not token_queue.empty():
+                try:
+                    token = token_queue.get(timeout=0.05)
+                    yield token
+                    if self._cancelled:
+                        logger.info("LLM: Generation cancelled mid-stream")
+                        break
+                except queue.Empty:
+                    if self._cancelled:
+                        break
+                    await asyncio.sleep(0.01)
+        finally:
+            self._generating = False
 
     @property
     def chat_format(self) -> str:

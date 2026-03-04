@@ -33,6 +33,12 @@ VALID_TRANSITIONS: dict[ConversationState, set[ConversationState]] = {
     ConversationState.SPEAKING: {
         ConversationState.LISTENING,  # TTS complete or barge-in
         ConversationState.IDLE,  # Stop
+        ConversationState.SPEAKING_AND_LISTENING,  # NEW: voice detected while AI is speaking
+    },
+    ConversationState.SPEAKING_AND_LISTENING: {  # NEW: full-duplex state
+        ConversationState.LISTENING,   # speech_end -> full barge-in
+        ConversationState.SPEAKING,    # speech_end -> user stopped quickly, resume speaking
+        ConversationState.IDLE,        # stop / error recovery
     },
 }
 
@@ -53,6 +59,10 @@ class ConversationStateMachine:
         PROCESSING → LISTENING (barge-in during processing)
         SPEAKING → LISTENING (TTS complete or barge-in)
         SPEAKING → IDLE (stop)
+        SPEAKING → SPEAKING_AND_LISTENING (voice detected while AI is speaking)
+        SPEAKING_AND_LISTENING → LISTENING (user continues — full barge-in)
+        SPEAKING_AND_LISTENING → SPEAKING (user stopped quickly — resume)
+        SPEAKING_AND_LISTENING → IDLE (stop / error recovery)
     """
 
     def __init__(self):
@@ -78,7 +88,11 @@ class ConversationStateMachine:
     @property
     def is_interruptible(self) -> bool:
         """Whether barge-in is currently possible."""
-        return self._state in (ConversationState.SPEAKING, ConversationState.PROCESSING)
+        return self._state in (
+            ConversationState.SPEAKING,
+            ConversationState.PROCESSING,
+            ConversationState.SPEAKING_AND_LISTENING,
+        )
 
     async def transition_to(
         self,
@@ -190,7 +204,7 @@ class ConversationStateMachine:
 
         Returns True if barge-in was executed.
         """
-        if self._state == ConversationState.SPEAKING:
+        if self._state in (ConversationState.SPEAKING, ConversationState.SPEAKING_AND_LISTENING):
             # First invoke barge-in callbacks to clear buffers
             for callback in self._barge_in_callbacks:
                 try:

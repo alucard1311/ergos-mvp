@@ -17,6 +17,7 @@ class ConversationState(Enum):
     LISTENING = "listening"  # Receiving audio, waiting for speech
     PROCESSING = "processing"  # Processing speech (STT → LLM)
     SPEAKING = "speaking"  # Playing TTS output
+    SPEAKING_AND_LISTENING = "speaking_and_listening"  # Full-duplex: AI speaking while listening for interruption
 
 
 @dataclass
