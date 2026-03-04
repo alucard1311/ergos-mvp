@@ -275,6 +275,47 @@ async def create_pipeline(config: Config) -> Pipeline:
     state_machine.add_callback(data_handler.get_state_callback())
     logger.debug("Wired: state machine -> data channel broadcast")
 
+    # ========== Idle timeout state change wiring (registered early, used later) ==========
+    # ========== Idle timeout infrastructure ==========
+    # Timeout to IDLE after 30s of silence post-response (locked decision from CONTEXT.md)
+    _idle_timeout_task: list[Optional[asyncio.Task]] = [None]
+
+    async def _start_idle_timeout() -> None:
+        """Start 30s idle timeout. Cancelled when user starts speaking."""
+        # Cancel any existing timeout first
+        if _idle_timeout_task[0] is not None and not _idle_timeout_task[0].done():
+            _idle_timeout_task[0].cancel()
+
+        async def _idle_timeout():
+            await asyncio.sleep(30.0)
+            current = state_machine.state
+            if current == ConversationState.LISTENING:
+                logger.info("Idle timeout: 30s without speech, transitioning to IDLE")
+                await state_machine.stop()
+            elif current == ConversationState.IDLE:
+                logger.debug("Idle timeout: already IDLE, no action needed")
+
+        _idle_timeout_task[0] = asyncio.create_task(_idle_timeout())
+        logger.debug("Idle timeout: 30s timer started")
+
+    async def _cancel_idle_timeout() -> None:
+        """Cancel idle timeout when user starts speaking."""
+        if _idle_timeout_task[0] is not None and not _idle_timeout_task[0].done():
+            _idle_timeout_task[0].cancel()
+            _idle_timeout_task[0] = None
+            logger.debug("Idle timeout: cancelled by speech")
+
+    # Wire idle timeout to state changes: start 30s timer on IDLE entry, cancel on activity
+    async def _on_state_change_for_idle_timeout(event) -> None:
+        """Start idle timeout when entering IDLE; cancel on any activity."""
+        if event.new_state == ConversationState.IDLE:
+            await _start_idle_timeout()
+        elif event.new_state in (ConversationState.LISTENING, ConversationState.PROCESSING):
+            await _cancel_idle_timeout()
+
+    state_machine.add_callback(_on_state_change_for_idle_timeout)
+    logger.debug("Wired: state machine -> idle timeout manager (30s on IDLE entry)")
+
     # Register state machine transitions for VAD events FIRST
     # (must happen before STT processing to ensure correct state)
     _overlap_timer_task: list[Optional[asyncio.Task]] = [None]  # Track overlap timer for cancellation
@@ -290,6 +331,9 @@ async def create_pipeline(config: Config) -> Pipeline:
         current_state = state_machine.state
 
         if event.type == VADEventType.SPEECH_START:
+            # Cancel any pending idle timeout — user is speaking
+            await _cancel_idle_timeout()
+
             if current_state in (ConversationState.IDLE, ConversationState.LISTENING):
                 await state_machine.start_listening()
 
@@ -358,8 +402,21 @@ async def create_pipeline(config: Config) -> Pipeline:
 
     # Register completion callback to flush TTS buffer after LLM finishes
     async def on_llm_complete(result) -> None:
-        """Flush TTS buffer and wait for audio to finish before transitioning state."""
+        """Flush TTS buffer and wait for audio to finish before transitioning state.
+
+        Handles barge-in: if state has already changed (e.g., barge-in occurred
+        mid-response), skip the audio drain loop to avoid spurious state transitions.
+        """
         logger.info(f"LLM completed: {len(result.text)} chars, {result.tokens_generated} tokens")
+
+        # If barge-in occurred, skip the wait-for-audio sequence
+        # The state machine is already in LISTENING or PROCESSING from barge-in
+        current = state_machine.state
+        if current not in (ConversationState.PROCESSING, ConversationState.SPEAKING, ConversationState.SPEAKING_AND_LISTENING):
+            logger.info(f"LLM complete but state is {current.value} (barge-in occurred), skipping audio drain")
+            tts_processor.reset_audio_tracking()
+            return
+
         await tts_processor.flush()
 
         # Wait for TTS synthesis to complete (in case flush triggered synthesis)
