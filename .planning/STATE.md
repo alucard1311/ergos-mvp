@@ -72,7 +72,7 @@ v2-relevant decisions:
 
 ### Pending Todos
 
-None yet.
+1. Add local speaker output mode bypassing WebRTC (`--local-audio` flag, sounddevice)
 
 ### Blockers/Concerns
 
