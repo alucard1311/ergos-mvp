@@ -24,6 +24,7 @@ class ConnectionManager:
     Attributes:
         _connections: Set of active peer connections.
         _data_channels: Set of active data channels.
+        _on_disconnect: Optional async callback called when a peer disconnects.
     """
 
     def __init__(self) -> None:
@@ -31,6 +32,17 @@ class ConnectionManager:
         self._connections: Set[RTCPeerConnection] = set()
         self._data_channels: Set = set()
         self._tracks: Dict[RTCPeerConnection, "TTSAudioTrack"] = {}
+        self._on_disconnect: Optional[asyncio.coroutines] = None
+
+    def set_disconnect_callback(self, callback) -> None:
+        """Register an async callback to be called when a peer disconnects.
+
+        Args:
+            callback: Async callable invoked with no arguments when a peer
+                      connection reaches 'failed' or 'closed' state.
+        """
+        self._on_disconnect = callback
+        logger.debug("Registered disconnect callback")
 
     async def create_connection(self) -> RTCPeerConnection:
         """
@@ -59,6 +71,13 @@ class ConnectionManager:
                     logger.debug("Stopped TTS audio track for closed connection")
                 self._connections.discard(pc)
                 logger.info(f"Connection removed from tracking (state: {state})")
+
+                # Invoke disconnect callback (e.g. for memory extraction)
+                if self._on_disconnect is not None:
+                    try:
+                        await self._on_disconnect()
+                    except Exception as e:
+                        logger.error(f"Disconnect callback error: {e}")
 
         logger.info("Created new RTCPeerConnection")
         return pc

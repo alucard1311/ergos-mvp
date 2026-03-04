@@ -19,6 +19,9 @@ from ergos.llm.generator import LLMGenerator
 from ergos.llm.processor import LLMProcessor
 from ergos.plugins import PluginManager
 from ergos.persona.loader import DEFAULT_PERSONA, load_persona
+from ergos.persona.builder import TARSPromptBuilder, get_time_context, try_sarcasm_command
+from ergos.memory import MemoryStore, MemoryEntry
+from ergos.memory.store import EXTRACTION_PROMPT, parse_extraction_result, format_history_for_extraction
 from ergos.state import ConversationStateMachine, ConversationState
 from ergos.stt.processor import STTProcessor
 from ergos.stt.transcriber import WhisperTranscriber
@@ -196,6 +199,31 @@ async def create_pipeline(config: Config) -> Pipeline:
     # Use persona's system prompt unless overridden
     if config.persona.persona_file:
         system_prompt = persona.system_prompt
+
+    # If TARS persona (default or from file), use TARSPromptBuilder
+    prompt_builder = None
+    memory_store = MemoryStore()
+    current_sarcasm_level = [config.persona.sarcasm_level]  # Mutable for voice command updates
+
+    if persona.is_tars_persona:
+        prompt_builder = TARSPromptBuilder()
+        # Load memories for prompt injection
+        all_memories = memory_store.load()
+        budget_memories = memory_store.get_budget(all_memories)
+        memory_strings = [m.content for m in budget_memories]
+        time_context = get_time_context()
+
+        system_prompt = prompt_builder.build(
+            name=persona.name,
+            sarcasm_level=current_sarcasm_level[0],
+            memories=memory_strings,
+            time_context=time_context,
+        )
+        logger.info(
+            f"TARS persona active: sarcasm={current_sarcasm_level[0]}%, "
+            f"{len(budget_memories)} memories loaded"
+        )
+    # else: system_prompt already set from persona.system_prompt or inline config (existing behavior unchanged)
 
     # Create LLM generator if model path is configured
     llm_processor: Optional[LLMProcessor] = None
@@ -679,9 +707,41 @@ async def create_pipeline(config: Config) -> Pipeline:
 
         Checks if any plugin should handle the input. If so, routes
         to the plugin. Otherwise, passes through to LLM processor.
+        Sarcasm voice commands are intercepted BEFORE plugins and LLM.
         """
         text = result.text
         logger.info(f"Transcription: {text}")
+
+        # === TARS sarcasm command intercept (before plugins and LLM) ===
+        if prompt_builder is not None:
+            new_level = try_sarcasm_command(text)
+            if new_level is not None:
+                current_sarcasm_level[0] = new_level
+                # Rebuild system prompt with new sarcasm level
+                all_mems = memory_store.load()
+                budget_mems = memory_store.get_budget(all_mems)
+                mem_strs = [m.content for m in budget_mems]
+                new_prompt = prompt_builder.build(
+                    name=persona.name,
+                    sarcasm_level=new_level,
+                    memories=mem_strs,
+                    time_context=get_time_context(),
+                )
+                llm_processor.update_system_prompt(new_prompt)
+                logger.info(f"Sarcasm level updated to {new_level}%")
+
+                # Speak confirmation via TTS without going through LLM
+                confirmations = {
+                    range(0, 21): f"Sarcasm level set to {new_level}%. All business.",
+                    range(21, 50): f"Sarcasm at {new_level}%. I'll try to keep a straight face.",
+                    range(50, 80): f"Sarcasm now at {new_level}%. This should be interesting.",
+                    range(80, 101): f"Sarcasm cranked to {new_level}%. You asked for it.",
+                }
+                confirmation = next(
+                    msg for rng, msg in confirmations.items() if new_level in rng
+                )
+                await plugin_speak_callback(confirmation)
+                return  # Don't forward to plugins or LLM
 
         # Check if a plugin should handle this
         plugin = plugin_manager.route_input(text)
@@ -794,6 +854,47 @@ async def create_pipeline(config: Config) -> Pipeline:
         on_incoming_audio=on_incoming_audio,
     )
     logger.debug("Created signaling app")
+
+    # ========== Memory extraction on disconnect ==========
+    # Runs after session ends — uses generator.generate() directly to avoid
+    # polluting LLM conversation history (anti-pattern: never use llm_processor here)
+    async def _extract_and_save_memories() -> None:
+        """Extract memories from conversation history and save to disk."""
+        if llm_processor is None or not persona.is_tars_persona:
+            return
+
+        history_text = format_history_for_extraction(llm_processor.history)
+        if history_text is None:
+            logger.info("Memory extraction skipped: too few messages in history")
+            return
+
+        logger.info("Extracting session memories...")
+        loop = asyncio.get_event_loop()
+        try:
+            prompt = EXTRACTION_PROMPT.format(history=history_text)
+            # Wrap generator.generate() in executor — it is synchronous and must not
+            # block the event loop. Never use llm_processor here (pollutes history).
+            from ergos.llm.types import GenerationConfig as _GenConfig
+            result = await loop.run_in_executor(
+                None,
+                lambda: generator.generate(prompt, config=_GenConfig(max_tokens=300)),
+            )
+            new_entries = parse_extraction_result(result.text)
+            if new_entries:
+                existing = memory_store.load()
+                existing.extend(new_entries)
+                existing = memory_store.prune(existing)
+                memory_store.save(existing)
+                logger.info(f"Saved {len(new_entries)} new memories ({len(existing)} total)")
+            else:
+                logger.info("No memorable moments extracted from this session")
+        except Exception as e:
+            logger.error(f"Memory extraction failed: {e}")
+            # Never lose existing memories on extraction failure (Pitfall 2)
+
+    # Register memory extraction to run on peer disconnect
+    connection_manager.set_disconnect_callback(_extract_and_save_memories)
+    logger.debug("Wired: peer disconnect -> memory extraction")
 
     logger.info("Pipeline created and wired successfully")
 
