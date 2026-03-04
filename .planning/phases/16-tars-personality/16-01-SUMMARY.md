@@ -51,7 +51,7 @@ patterns-established:
   - "Pattern 2: Voice command parsing via try_X_command() returning Optional[int] — None means not a command"
   - "Pattern 3: Builder.build() always returns complete, self-contained prompt string — no partial composition at call site"
 
-requirements-completed: [PERS-01, PERS-02]
+requirements-completed: [PERS-01]
 
 # Metrics
 duration: 3min
@@ -81,10 +81,10 @@ completed: 2026-03-04
 
 Each task was committed atomically:
 
-1. **Task 1: Create test suite for TARS personality infrastructure** - `fb414677` (test — RED phase)
-2. **Task 2: Implement TARS persona, prompt builder, config extensions, loader update** - `61fc6b4b` (feat — GREEN phase)
+1. **Task 1 (TDD RED): Add failing tests for TARS personality infrastructure** - `fb41467` (test)
+2. **Task 2 (TDD GREEN): Implement TARS persona infrastructure** - `61fc6b4` (feat)
 
-**Plan metadata:** `(pending)` (docs: complete plan)
+**Plan metadata:** `b3a1077` (docs: complete plan)
 
 _Note: TDD tasks have two commits — test commit (RED) then implementation commit (GREEN)_
 
@@ -114,7 +114,7 @@ _Note: TDD tasks have two commits — test commit (RED) then implementation comm
 - **Fix:** Rewrote regex pattern to use `(?<!\w)(-?\d{1,3})(?!\d)` with negative lookbehind, capturing optional minus sign before digits
 - **Files modified:** src/ergos/persona/builder.py
 - **Verification:** All 3 sarcasm command tests pass (80%, 150%->100, -10%->0)
-- **Committed in:** `61fc6b4b` (Task 2 feat commit)
+- **Committed in:** `61fc6b4` (Task 2 feat commit)
 
 ---
 
