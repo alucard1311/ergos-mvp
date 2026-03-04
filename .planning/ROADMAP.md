@@ -168,7 +168,11 @@ Plans:
   2. User can speak while AI is speaking and AI continues to listen (SPEAKING_AND_LISTENING state active)
   3. When user speaks during AI output, AI audio stops within 200ms and system transitions to processing the interruption
   4. State machine logs SPEAKING_AND_LISTENING transitions correctly
-**Plans**: TBD
+**Plans**: 3 plans
+Plans:
+- [ ] 14-01-PLAN.md — State machine SPEAKING_AND_LISTENING + LLM cancel fix + test suite
+- [ ] 14-02-PLAN.md — Flutter client orb visual + barge-in guard + VAD sensitivity
+- [ ] 14-03-PLAN.md — Pipeline barge-in wiring + overlap timer + idle timeout
 
 #### Phase 15: Expressive Voice
 **Goal**: AI voice delivers emotion, natural pauses, and timed sarcastic delivery via upgraded TTS
@@ -242,8 +246,8 @@ Phases execute in numeric order: 13 → 14 → 15 → 16 → 17 → 18 → 19
 | 10. Flutter Client UI | v1.0 | 2/2 | Complete | 2026-01-26 |
 | 11. Flutter Client Platform | v1.0 | 1/1 | Complete | 2026-01-26 |
 | 12. Integration & Latency | v1.0 | 3/3 | Complete | 2026-01-26 |
-| 13. Model Upgrade & VRAM Orchestration | 2/2 | Complete   | 2026-03-03 | - |
-| 14. Full-Duplex Conversation | v2.0 | 0/? | Not started | - |
+| 13. Model Upgrade & VRAM Orchestration | v2.0 | 2/2 | Complete | 2026-03-03 |
+| 14. Full-Duplex Conversation | v2.0 | 0/3 | Planning | - |
 | 15. Expressive Voice | v2.0 | 0/? | Not started | - |
 | 16. TARS Personality | v2.0 | 0/? | Not started | - |
 | 17. Agentic Execution | v2.0 | 0/? | Not started | - |
