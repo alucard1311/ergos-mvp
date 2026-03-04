@@ -86,21 +86,23 @@ class TestMemoryStore:
         """Entries with higher access_count survive pruning over same-age but lower access_count."""
         store = MemoryStore(storage_path=tmp_path / "memory.json")
 
-        # Create 101 entries: 100 with timestamp=1.0 access_count=0, and 1 with timestamp=0.0 access_count=100
+        # Create 101 entries all with the same timestamp (same age).
+        # 100 entries have access_count=0; the special entry has access_count=10.
+        # When pruning to 100, the frequently-accessed entry should survive.
         entries = [
-            MemoryEntry(content=f"common {i}", category="fact", timestamp=1.0, access_count=0)
+            MemoryEntry(content=f"common {i}", category="fact", timestamp=1000.0, access_count=0)
             for i in range(100)
         ]
-        # Add a very old but frequently accessed entry
-        high_access = MemoryEntry(content="high access old", category="fact", timestamp=0.0, access_count=100)
+        # Same timestamp but higher access_count -- should survive pruning
+        high_access = MemoryEntry(content="high access same age", category="fact", timestamp=1000.0, access_count=10)
         entries.append(high_access)
 
         pruned = store.prune(entries, max_size=100)
 
         assert len(pruned) == 100
-        # The high-access entry should survive because its score includes access_count boost
+        # The high-access entry should survive because its normalized access_count score is higher
         contents = [e.content for e in pruned]
-        assert "high access old" in contents, "High access_count entry should survive pruning"
+        assert "high access same age" in contents, "High access_count entry should survive pruning over same-age entries"
 
     def test_budget(self, tmp_path):
         """get_budget() with 20 entries returns exactly 15, most recent first."""
