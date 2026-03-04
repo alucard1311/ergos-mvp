@@ -70,8 +70,9 @@ class PersonaConfig(BaseModel):
 
     persona_file: Optional[str] = None  # Path to persona YAML file
     # Fallback values if no file specified
-    name: str = "Ergos"
+    name: str = "TARS"
     system_prompt: str = "You are a helpful voice assistant."
+    sarcasm_level: int = Field(default=75, ge=0, le=100)  # Humor intensity 0-100
 
 
 class Config(BaseModel):
