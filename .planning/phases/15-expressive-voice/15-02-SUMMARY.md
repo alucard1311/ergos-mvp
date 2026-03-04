@@ -104,6 +104,15 @@ None — no external service configuration required.
 - Task 2 (human-verify checkpoint) requires: running Orpheus TTS and listening for perceptible expressiveness vs Kokoro flat output
 - After human verification, phase 15 is complete and VOICE-04 requirement is fulfilled
 
+## Self-Check: PASSED
+
+- FOUND: src/ergos/tts/emotion_markup.py
+- FOUND: tests/unit/test_emotion_markup.py
+- FOUND: .planning/phases/15-expressive-voice/15-02-SUMMARY.md
+- FOUND: commit 032af26a (TDD RED — failing tests)
+- FOUND: commit 420b6f63 (feat GREEN — implementation)
+- Human-verify checkpoint: APPROVED by user
+
 ---
 *Phase: 15-expressive-voice*
 *Completed: 2026-03-04*
