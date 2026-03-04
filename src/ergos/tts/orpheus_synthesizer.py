@@ -26,9 +26,15 @@ class OrpheusSynthesizer:
     The model is loaded lazily on first use via _ensure_model().
     """
 
+    # orpheus-cpp hardcodes n_ctx=0 which inherits the model's 128K default,
+    # creating a 14GB KV cache that OOMs on most machines. We patch it to a
+    # sensible value for TTS (2048 tokens is plenty for single utterances).
+    DEFAULT_N_CTX = 2048
+
     def __init__(
         self,
         n_gpu_layers: int = -1,
+        n_ctx: int = DEFAULT_N_CTX,
         lang: str = "en",
         verbose: bool = False,
     ) -> None:
@@ -37,32 +43,52 @@ class OrpheusSynthesizer:
         Args:
             n_gpu_layers: Number of GPU layers to offload. -1 means all layers.
                           Set to 0 for CPU-only.
+            n_ctx: Context window size for KV cache. Default 2048 to avoid the
+                   library's 128K default that requires 14GB+ RAM.
             lang: Language code for Orpheus model (default "en").
             verbose: Enable verbose llama.cpp output (default False).
         """
         self._n_gpu_layers = n_gpu_layers
+        self._n_ctx = n_ctx
         self._lang = lang
         self._verbose = verbose
 
         self._orpheus = None
 
     def _ensure_model(self):
-        """Lazy load Orpheus model via orpheus-cpp."""
+        """Lazy load Orpheus model via orpheus-cpp.
+
+        Patches llama_cpp.Llama to override n_ctx before OrpheusCpp creates
+        its model, then restores the original constructor.
+        """
         if self._orpheus is not None:
             return self._orpheus
 
         logger.info(
             f"Loading Orpheus 3B model "
-            f"(n_gpu_layers={self._n_gpu_layers}, lang={self._lang})..."
+            f"(n_gpu_layers={self._n_gpu_layers}, n_ctx={self._n_ctx}, "
+            f"lang={self._lang})..."
         )
 
+        import llama_cpp
         from orpheus_cpp import OrpheusCpp
 
-        self._orpheus = OrpheusCpp(
-            n_gpu_layers=self._n_gpu_layers,
-            lang=self._lang,
-            verbose=self._verbose,
-        )
+        _original_init = llama_cpp.Llama.__init__
+        n_ctx = self._n_ctx
+
+        def _patched_init(self_llama, *args, **kwargs):
+            kwargs["n_ctx"] = n_ctx
+            return _original_init(self_llama, *args, **kwargs)
+
+        llama_cpp.Llama.__init__ = _patched_init
+        try:
+            self._orpheus = OrpheusCpp(
+                n_gpu_layers=self._n_gpu_layers,
+                lang=self._lang,
+                verbose=self._verbose,
+            )
+        finally:
+            llama_cpp.Llama.__init__ = _original_init
 
         logger.info("Orpheus 3B model loaded successfully")
 
@@ -101,6 +127,8 @@ class OrpheusSynthesizer:
         options = self._build_options(config)
         sample_rate, audio_int16 = self._orpheus.tts(text, options)
 
+        # orpheus-cpp returns shape (1, N) — squeeze to 1D for playback/pipeline
+        audio_int16 = np.squeeze(audio_int16)
         # Convert int16 -> float32 normalized to [-1, 1]
         audio_float32 = audio_int16.astype(np.float32) / 32768.0
         duration_ms = (len(audio_float32) / SAMPLE_RATE) * 1000.0
