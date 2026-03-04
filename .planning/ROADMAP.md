@@ -3,7 +3,7 @@
 ## Milestones
 
 - ✅ **v1.0 Baseline** - Phases 1-12 (shipped 2026-01-26)
-- 🚧 **v2.0 TARS** - Phases 13-19 (in progress)
+- 🚧 **v2.0 TARS** - Phases 13-21 (in progress)
 
 ## Phases
 
@@ -234,10 +234,31 @@ Plans:
   3. Cloud response integrates into conversation flow identically to local response
 **Plans**: TBD
 
+#### Phase 20: Claude Orchestrator
+**Goal**: TARS delegates complex tasks (coding, research, brainstorming, multi-step analysis) to Claude Agent SDK while maintaining voice conversation flow
+**Depends on**: Phase 16, Phase 17
+**Requirements**: ORCH-01, ORCH-02, ORCH-03, ORCH-04
+**Success Criteria** (what must be TRUE):
+  1. TARS correctly classifies requests as LOCAL vs DELEGATE and routes accordingly
+  2. User voice-commands a complex task ("research WebSocket reconnection") and hears Claude's response streamed through TTS
+  3. Long-running Claude tasks run in background — user can still talk to TARS, and can cancel with voice barge-in
+  4. User says "continue that analysis" and Claude resumes from the previous session context
+**Research**: `.planning/research/claude-code-orchestrator-integration.md`
+**Plans**: TBD
+
+#### Phase 21: Context-Aware Conversation
+**Goal**: TARS maintains conversational threads during brainstorming, tracks ideas by number, and intelligently manages context window for long sessions
+**Depends on**: Phase 16
+**Requirements**: CTX-01, CTX-02
+**Success Criteria** (what must be TRUE):
+  1. During brainstorming, TARS accumulates ideas and user can reference them ("go back to idea 3", "combine the first two")
+  2. In long sessions, older exchanges are automatically summarized while preserving key decisions and referenced items
+**Plans**: TBD
+
 ## Progress
 
 **Execution Order:**
-Phases execute in numeric order: 13 → 14 → 15 → 16 → 17 → 18 → 19
+Phases execute in numeric order: 13 → 14 → 15 → 16 → 17 → 18 → 19 → 20 → 21
 
 | Phase | Milestone | Plans Complete | Status | Completed |
 |-------|-----------|----------------|--------|-----------|
@@ -256,10 +277,12 @@ Phases execute in numeric order: 13 → 14 → 15 → 16 → 17 → 18 → 19
 | 13. Model Upgrade & VRAM Orchestration | v2.0 | 2/2 | Complete | 2026-03-03 |
 | 14. Full-Duplex Conversation | v2.0 | 3/3 | Complete | 2026-03-04 |
 | 15. Expressive Voice | v2.0 | Complete    | 2026-03-04 | 2026-03-04 |
-| 16. TARS Personality | 3/3 | Complete   | 2026-03-04 | - |
+| 16. TARS Personality | 2/3 | In Progress|  | - |
 | 17. Agentic Execution | v2.0 | 0/? | Not started | - |
 | 18. Vision | v2.0 | 0/? | Not started | - |
 | 19. Cloud Fallback | v2.0 | 0/? | Not started | - |
+| 20. Claude Orchestrator | v2.0 | 0/? | Not started | - |
+| 21. Context-Aware Conversation | v2.0 | 0/? | Not started | - |
 
 ---
 *Roadmap created: 2026-01-26*
