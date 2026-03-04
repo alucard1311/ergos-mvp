@@ -1,108 +1,99 @@
 ---
 phase: 16-tars-personality
 plan: "03"
-subsystem: pipeline
-tags: [tars, personality, memory, sarcasm, pipeline-wiring, connection-manager, integration]
+subsystem: persona
+tags: [tars, personality, pipeline, memory, sarcasm, webrtc, llm]
 
 # Dependency graph
 requires:
-  - phase: 16-tars-personality-01
-    provides: TARSPromptBuilder, try_sarcasm_command, get_time_context, Persona.is_tars_persona
-  - phase: 16-tars-personality-02
+  - phase: 16-01-tars-personality
+    provides: TARSPromptBuilder, try_sarcasm_command, get_time_context, PersonaConfig.sarcasm_level
+  - phase: 16-02-tars-personality
     provides: MemoryStore, MemoryEntry, EXTRACTION_PROMPT, parse_extraction_result, format_history_for_extraction
-
 provides:
-  - LLMProcessor.update_system_prompt() method for runtime system prompt changes
-  - Pipeline uses TARSPromptBuilder at startup when persona.is_tars_persona is True
-  - Sarcasm voice command intercept before plugins and LLM; TARS-style confirmation spoken via TTS
-  - Memories loaded at pipeline startup and injected into system prompt via get_budget()
-  - Memory extraction on peer disconnect using generator.generate() in run_in_executor
-  - ConnectionManager.set_disconnect_callback() for peer disconnect event hook
-
-affects: [16-04, tars-end-to-end, pipeline-integration-tests]
+  - Full TARS personality wiring in pipeline (prompt builder, memory, sarcasm intercept, disconnect extraction)
+  - update_system_prompt() method on LLMProcessor for runtime prompt changes
+  - set_disconnect_callback() on ConnectionManager for peer disconnect lifecycle events
+affects: [pipeline, llm, transport, tars-persona, memory-extraction]
 
 # Tech tracking
 tech-stack:
   added: []
   patterns:
-    - "Sarcasm command intercept: try_sarcasm_command() checked BEFORE plugin routing — returns early to avoid LLM processing"
-    - "Memory extraction at disconnect: generator.generate() in asyncio.run_in_executor — never blocks event loop, never pollutes history"
-    - "Disconnect callback pattern: ConnectionManager.set_disconnect_callback() registers async callback for peer lifecycle events"
-    - "Mutable closure via list wrapper: current_sarcasm_level = [N] allows mutation by nested async functions"
+    - "Mutable container pattern ([current_sarcasm_level]) for closure-captured mutable state"
+    - "Memory extraction via generator.generate() directly (not llm_processor) to avoid polluting conversation history"
+    - "run_in_executor wrapping synchronous generator.generate() for non-blocking async extraction"
+    - "Sarcasm command intercept as first gate in on_transcription_with_plugins — early return before plugins or LLM"
 
 key-files:
   created: []
   modified:
-    - src/ergos/llm/processor.py
     - src/ergos/pipeline.py
+    - src/ergos/llm/processor.py
     - src/ergos/transport/connection.py
 
 key-decisions:
   - "Memory extraction uses generator.generate() directly (not llm_processor) to avoid polluting conversation history"
-  - "Disconnect callback added to ConnectionManager via set_disconnect_callback() — clean hook without modifying signaling code"
-  - "Sarcasm command intercept placed before plugin routing (first gate) to prevent commands reaching LLM"
-  - "current_sarcasm_level stored as [int] list for mutable closure access in nested async functions"
+  - "ConnectionManager.set_disconnect_callback() added as clean hook for peer disconnect lifecycle events"
+  - "Sarcasm command intercept is first gate in on_transcription_with_plugins() — returns early so command never reaches plugins or LLM"
 
 patterns-established:
-  - "Pattern 1: Sarcasm intercept guard — if prompt_builder is not None: check try_sarcasm_command() before any routing"
-  - "Pattern 2: Memory extraction safety — format_history_for_extraction returns None for < 4 messages; extraction wrapped in try/except to never lose existing memories"
-  - "Pattern 3: ConnectionManager disconnect hook — set_disconnect_callback() for session-end cleanup tasks"
+  - "Mutable closure state: use list container [value] to allow mutation within nested async functions"
+  - "Async extraction: always use loop.run_in_executor for synchronous llama.cpp calls in async context"
+  - "Tier-based confirmation messages map sarcasm level ranges to distinct personality responses"
 
 requirements-completed: [PERS-01, PERS-02, PERS-03]
 
 # Metrics
-duration: 8min
+duration: 2min
 completed: 2026-03-04
 ---
 
-# Phase 16 Plan 03: Pipeline Integration Summary
+# Phase 16 Plan 03: TARS Personality Pipeline Wiring Summary
 
-**TARS personality fully wired into pipeline: TARSPromptBuilder at startup, sarcasm command intercept, memories injected at session start, extraction on disconnect**
+**TARS personality fully wired into pipeline: TARSPromptBuilder at startup, sarcasm voice command intercept before plugins/LLM, memory injection at session start, and async memory extraction on peer disconnect**
 
 ## Performance
 
-- **Duration:** ~8 min
-- **Started:** 2026-03-04T05:15:00Z
-- **Completed:** 2026-03-04T05:23:00Z
+- **Duration:** ~2 min
+- **Started:** 2026-03-04T05:09:48Z
+- **Completed:** 2026-03-04T05:11:14Z
 - **Tasks:** 2
 - **Files modified:** 3
 
 ## Accomplishments
 
-- LLMProcessor.update_system_prompt() added — enables runtime sarcasm level changes without recreating the processor
-- Pipeline builds system prompt via TARSPromptBuilder when persona.is_tars_persona is True, with memories and time context injected at startup
-- Sarcasm voice commands ("set sarcasm to N%") intercepted before plugins and LLM, rebuild prompt, and speak a TARS-style confirmation without going through LLM
-- Memory extraction runs on WebRTC peer disconnect using generator.generate() directly in run_in_executor — preserves conversation history integrity and does not block the event loop
-- ConnectionManager.set_disconnect_callback() provides a clean hook for session-end lifecycle events
+- LLMProcessor.update_system_prompt() added for runtime system prompt changes (sarcasm level updates)
+- ConnectionManager.set_disconnect_callback() added as clean lifecycle hook for peer disconnect events
+- Pipeline wired with full TARS personality: TARSPromptBuilder activates when is_tars_persona=True, memories loaded at startup and injected into system prompt, sarcasm voice commands intercepted as first gate before plugins and LLM
+- Memory extraction runs asynchronously on peer disconnect via generator.generate() in executor, skips sessions with fewer than 4 messages, preserves existing memories on extraction failure
 
 ## Task Commits
 
 Each task was committed atomically:
 
-1. **Task 1: Add dynamic system_prompt update to LLMProcessor** - `a013845c` (feat)
-2. **Task 2: Wire TARS personality into pipeline** - `196cc536` (feat)
+1. **Task 1: Add update_system_prompt to LLMProcessor and set_disconnect_callback to ConnectionManager** - `a013845` (feat)
+2. **Task 2: Wire TARS personality into pipeline: prompt builder, memory, sarcasm intercept, disconnect extraction** - `196cc53` (feat)
 
 ## Files Created/Modified
 
-- `src/ergos/llm/processor.py` - Added update_system_prompt(new_prompt) method with info logging
-- `src/ergos/pipeline.py` - Import TARSPromptBuilder/MemoryStore/helpers; TARS prompt builder at startup; sarcasm command intercept in on_transcription_with_plugins; memory extraction on disconnect
-- `src/ergos/transport/connection.py` - Added set_disconnect_callback() and invocation in on_connection_state_change (failed/closed states)
+- `src/ergos/pipeline.py` — Full TARS personality wiring: prompt builder activation, memory loading, sarcasm intercept, disconnect extraction callback
+- `src/ergos/llm/processor.py` — Added update_system_prompt() method for runtime sarcasm level changes
+- `src/ergos/transport/connection.py` — Added set_disconnect_callback() hook; invoked on 'failed'/'closed' connection states
 
 ## Decisions Made
 
-- Memory extraction uses `generator.generate()` directly (not `llm_processor.process_transcription()`) to avoid adding extraction output to conversation history and avoid confusing LLM context with meta-analysis
-- Disconnect callback added to `ConnectionManager` via `set_disconnect_callback()` rather than modifying `create_signaling_app()` — preserves separation of concerns; signaling layer doesn't need to know about memory
-- Sarcasm intercept is the FIRST gate inside `on_transcription_with_plugins()` — returns early so command never reaches plugins or LLM
-- `current_sarcasm_level` stored as `[int]` list (mutable closure pattern) so nested async callbacks can update it in-place
-- Extraction wrapped in broad `except Exception` to guarantee existing memories are never lost on extraction failure
+- Memory extraction uses generator.generate() directly (not llm_processor) to avoid polluting conversation history
+- ConnectionManager.set_disconnect_callback() added as clean hook — invoked in existing connectionstatechange handler
+- Sarcasm command intercept is first gate — returns early before plugins or LLM so commands are never forwarded
 
 ## Deviations from Plan
 
-None - plan executed exactly as written. All four integration points implemented as specified.
+None - plan executed exactly as written. Both task implementations were present from a prior execution session; this session verified all 227 unit tests pass and created the SUMMARY.md.
 
 ## Issues Encountered
 
-None.
+None - all 227 unit tests pass with no regressions.
 
 ## User Setup Required
 
@@ -110,9 +101,9 @@ None - no external service configuration required.
 
 ## Next Phase Readiness
 
-- TARS personality is fully active for all conversations using the default TARS persona or any persona with is_tars_persona=True
-- Memory extraction will begin populating ~/.ergos/memory.json after first real conversation session
-- All 223 unit tests passing, no regressions
+- Phase 16 TARS Personality is complete: infrastructure (16-01), memory store (16-02), pipeline wiring (16-03) all done
+- Phase 17 (Agentic Execution) can begin — depends on Phase 13 and Phase 16, both now complete
+- Memory file at ~/.ergos/memory.json will accumulate cross-session memories from first real session
 
 ---
 *Phase: 16-tars-personality*
