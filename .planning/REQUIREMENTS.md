@@ -102,6 +102,18 @@ Requirements for TARS milestone. Each maps to roadmap phases (13+).
 - [x] **ARCH-01**: VRAM orchestration manages concurrent model loading within 16GB budget
 - [ ] **ARCH-02**: Optional cloud LLM fallback with explicit user consent per-query
 
+### Claude Orchestrator
+
+- [ ] **ORCH-01**: TARS classifies user requests as LOCAL (handle with Qwen3) or DELEGATE (send to Claude)
+- [ ] **ORCH-02**: Complex tasks delegated to Claude Agent SDK with streaming output relayed through TTS
+- [ ] **ORCH-03**: Long-running Claude tasks run in background with progress announcements and barge-in cancellation
+- [ ] **ORCH-04**: Claude sessions persist across voice interactions for multi-turn delegation ("continue that analysis")
+
+### Context-Aware Conversation
+
+- [ ] **CTX-01**: TARS tracks conversational threads during brainstorming sessions (idea accumulation, referencing by number)
+- [ ] **CTX-02**: Context window managed intelligently — older exchanges compressed/summarized while preserving key points
+
 ## v3 Requirements
 
 Deferred to future release. Tracked but not in current roadmap.
@@ -198,10 +210,16 @@ Deferred to future release. Tracked but not in current roadmap.
 | VIS-02 | Phase 18 | Pending |
 | VIS-03 | Phase 18 | Pending |
 | ARCH-02 | Phase 19 | Pending |
+| ORCH-01 | Phase 20 | Pending |
+| ORCH-02 | Phase 20 | Pending |
+| ORCH-03 | Phase 20 | Pending |
+| ORCH-04 | Phase 20 | Pending |
+| CTX-01 | Phase 21 | Pending |
+| CTX-02 | Phase 21 | Pending |
 
 **Coverage:**
 - v1 requirements: 34 total — 34 mapped ✓
-- v2.0 requirements: 19 total — 19 mapped ✓
+- v2.0 requirements: 25 total — 25 mapped ✓
 - Unmapped: 0 ✓
 
 ---
