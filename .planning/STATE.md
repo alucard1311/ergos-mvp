@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v2.0
 milestone_name: TARS
 status: planning
-stopped_at: Completed 14-full-duplex-conversation 14-01-PLAN.md
-last_updated: "2026-03-04T02:00:10.439Z"
+stopped_at: Completed 14-full-duplex-conversation 14-03-PLAN.md
+last_updated: "2026-03-04T02:07:15.516Z"
 last_activity: 2026-03-03 — v2.0 roadmap created, phases 13-19 defined
 progress:
   total_phases: 19
-  completed_phases: 13
+  completed_phases: 14
   total_plans: 31
-  completed_plans: 30
+  completed_plans: 31
   percent: 96
 ---
 
@@ -62,6 +62,9 @@ v2-relevant decisions:
 - [Phase 14-full-duplex-conversation]: VAD redemptionFrames reduced from 45 to 16 (~512ms) for fast turn-taking per CONTEXT.md locked decision
 - [Phase 14-full-duplex-conversation]: SPEAKING_AND_LISTENING -> PROCESSING not allowed — must go through LISTENING to avoid bypassing STT
 - [Phase 14-full-duplex-conversation]: LLM generate_stream() resets _cancelled=False at start — prevents silent empty generation after barge-in (Pitfall 3)
+- [Phase 14-full-duplex-conversation]: on_barge_in cancel order: LLM -> TTS -> audio tracks prevents TTS from re-queuing after cancel
+- [Phase 14-full-duplex-conversation]: Idle timeout starts on IDLE state entry via state change callback — 30s after system goes IDLE
+- [Phase 14-full-duplex-conversation]: on_llm_complete barge-in guard checks PROCESSING/SPEAKING/SPEAKING_AND_LISTENING before audio drain
 
 ### Pending Todos
 
@@ -73,6 +76,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-04T02:00:10.437Z
-Stopped at: Completed 14-full-duplex-conversation 14-01-PLAN.md
+Last session: 2026-03-04T02:07:15.515Z
+Stopped at: Completed 14-full-duplex-conversation 14-03-PLAN.md
 Resume file: None
