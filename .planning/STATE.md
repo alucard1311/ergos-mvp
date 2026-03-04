@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v2.0
 milestone_name: TARS
-status: completed
-stopped_at: Completed 16-02-PLAN.md (cross-session memory store)
-last_updated: "2026-03-04T05:08:11.607Z"
-last_activity: 2026-03-04 — Phase 15 Expressive Voice complete (human-verify approved)
+status: executing
+stopped_at: Completed 16-03-PLAN.md (TARS personality pipeline wiring)
+last_updated: "2026-03-04T05:12:24.137Z"
+last_activity: 2026-03-04 — Phase 16 Plan 01 complete (TARS personality infrastructure)
 progress:
   total_phases: 19
-  completed_phases: 15
+  completed_phases: 16
   total_plans: 36
-  completed_plans: 35
-  percent: 100
+  completed_plans: 36
+  percent: 97
 ---
 
 # Project State
@@ -75,6 +75,9 @@ v2-relevant decisions:
 - [Phase 16-tars-personality]: Section-based sarcasm blending uses two fixed template tiers (NEUTRAL/MAX_SARCASM) — cleaner output than interpolation
 - [Phase 16-tars-personality]: DEFAULT_PERSONA and PersonaConfig.name both changed from 'Ergos' to 'TARS' — TARS is the v2 identity
 - [Phase 16-tars-personality]: try_sarcasm_command() regex uses lookbehind (?<!\w) to capture negative sarcasm values like -10%
+- [Phase 16-tars-personality]: Memory extraction uses generator.generate() directly (not llm_processor) to avoid polluting conversation history
+- [Phase 16-tars-personality]: ConnectionManager.set_disconnect_callback() added as clean hook for peer disconnect lifecycle events
+- [Phase 16-tars-personality]: Sarcasm command intercept is first gate in on_transcription_with_plugins() — returns early so command never reaches plugins or LLM
 
 ### Pending Todos
 
@@ -86,6 +89,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-04T05:08:11.606Z
-Stopped at: Completed 16-02-PLAN.md (cross-session memory store)
+Last session: 2026-03-04T05:12:24.136Z
+Stopped at: Completed 16-03-PLAN.md (TARS personality pipeline wiring)
 Resume file: None
