@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v2.0
 milestone_name: TARS
 status: planning
-stopped_at: Completed 14-02-PLAN.md
-last_updated: "2026-03-04T01:55:34.766Z"
+stopped_at: Completed 14-full-duplex-conversation 14-01-PLAN.md
+last_updated: "2026-03-04T02:00:10.439Z"
 last_activity: 2026-03-03 — v2.0 roadmap created, phases 13-19 defined
 progress:
   total_phases: 19
   completed_phases: 13
   total_plans: 31
-  completed_plans: 29
+  completed_plans: 30
   percent: 96
 ---
 
@@ -60,6 +60,8 @@ v2-relevant decisions:
 - [Phase 13-model-upgrade-vram-orchestration]: VRAM registration hardcoded at pipeline creation: STT=1000MB, LLM=5200MB, TTS=500MB — known estimates, no dynamic file scanning
 - [Phase 14-full-duplex-conversation]: Flutter state strings are UPPERCASE (ServerState.fromJson calls .toUpperCase()) — all state checks use UPPERCASE including SPEAKING_AND_LISTENING
 - [Phase 14-full-duplex-conversation]: VAD redemptionFrames reduced from 45 to 16 (~512ms) for fast turn-taking per CONTEXT.md locked decision
+- [Phase 14-full-duplex-conversation]: SPEAKING_AND_LISTENING -> PROCESSING not allowed — must go through LISTENING to avoid bypassing STT
+- [Phase 14-full-duplex-conversation]: LLM generate_stream() resets _cancelled=False at start — prevents silent empty generation after barge-in (Pitfall 3)
 
 ### Pending Todos
 
@@ -71,6 +73,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-04T01:55:34.765Z
-Stopped at: Completed 14-02-PLAN.md
+Last session: 2026-03-04T02:00:10.437Z
+Stopped at: Completed 14-full-duplex-conversation 14-01-PLAN.md
 Resume file: None
