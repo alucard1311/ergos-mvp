@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v2.0
 milestone_name: TARS
-status: in-progress
-stopped_at: Completed 17-01-PLAN.md (tool registry and executor)
-last_updated: "2026-03-05T06:23:49.791Z"
+status: executing
+stopped_at: Completed 17-02-PLAN.md (ToolCallProcessor with agentic loop)
+last_updated: "2026-03-05T06:31:19.108Z"
 last_activity: 2026-03-05 — Phase 17 Plan 01 complete (tool registry and executor)
 progress:
   total_phases: 21
   completed_phases: 16
   total_plans: 39
-  completed_plans: 37
-  percent: 95
+  completed_plans: 38
+  percent: 97
 ---
 
 # Project State
@@ -26,11 +26,11 @@ See: .planning/PROJECT.md (updated 2026-03-03)
 ## Current Position
 
 Phase: 17 of 19 (Agentic Execution) — IN PROGRESS
-Plan: 1 of 3 in current phase — COMPLETE (17-01 tool registry and executor)
-Status: Phase 17 in progress; Plan 02 (ToolCallProcessor) is next
-Last activity: 2026-03-05 — Phase 17 Plan 01 complete (tool registry and executor)
+Plan: 2 of 3 in current phase — COMPLETE (17-02 ToolCallProcessor with agentic loop)
+Status: Phase 17 in progress; Plan 03 (Pipeline Wiring) is next
+Last activity: 2026-03-05 — Phase 17 Plan 02 complete (ToolCallProcessor with agentic loop)
 
-Progress: [█████████-] 95% (37/39 plans complete)
+Progress: [██████████] 97% (38/39 plans complete)
 
 ## v1 Performance Metrics (archived)
 
@@ -81,6 +81,9 @@ v2-relevant decisions:
 - [Phase 17-agentic-execution]: allowed_prefixes=None allows all commands for backwards-compatible user-defined tools; list (even empty) enforces allowlist
 - [Phase 17-agentic-execution]: _config stores extra YAML fields generically -- any tool can carry extra config without registry code changes
 - [Phase 17-agentic-execution]: file_read/shell_run/file_list all return error strings (never raise) -- callers never need try/except
+- [Phase 17]: create_chat_completion_sync holds model_lock during entire LLM call — prevents segfaults from concurrent llama_cpp access
+- [Phase 17]: asyncio.gather for narration+execution — avoids audible pause, both start concurrently before either completes
+- [Phase 17]: Tool messages are ephemeral — only original user text and final response written to llm_processor._history
 
 ### Pending Todos
 
@@ -98,6 +101,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-05T06:23:49.789Z
-Stopped at: Completed 17-01-PLAN.md (tool registry and executor)
+Last session: 2026-03-05T06:31:19.106Z
+Stopped at: Completed 17-02-PLAN.md (ToolCallProcessor with agentic loop)
 Resume file: None
