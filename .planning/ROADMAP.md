@@ -211,7 +211,11 @@ Plans:
   2. During tool execution AI speaks a narration phrase before and after the call ("Let me check that..." / "Done.")
   3. AI completes a multi-step request (e.g., find a file, read its contents, summarize) using chained tool calls
   4. A new tool added to the tool registry YAML is available for calling without restarting the server or modifying Python code
-**Plans**: TBD
+**Plans**: 3 plans
+Plans:
+- [ ] 17-01-PLAN.md — Tool registry + executor + built-in tools (file_read, shell_run, file_list) + tests
+- [ ] 17-02-PLAN.md — ToolCallProcessor agentic loop + LLMGenerator wrapper + narration + tests
+- [ ] 17-03-PLAN.md — Pipeline wiring + config + default YAML + processing timeout fix + human verification
 
 #### Phase 18: Vision
 **Goal**: AI can see the screen, read documents, and interact with UI elements on the user's desktop
@@ -278,7 +282,7 @@ Phases execute in numeric order: 13 → 14 → 15 → 16 → 17 → 18 → 19 �
 | 14. Full-Duplex Conversation | v2.0 | 3/3 | Complete | 2026-03-04 |
 | 15. Expressive Voice | v2.0 | Complete    | 2026-03-04 | 2026-03-04 |
 | 16. TARS Personality | 3/3 | Complete    | 2026-03-04 | - |
-| 17. Agentic Execution | v2.0 | 0/? | Not started | - |
+| 17. Agentic Execution | v2.0 | 0/3 | Not started | - |
 | 18. Vision | v2.0 | 0/? | Not started | - |
 | 19. Cloud Fallback | v2.0 | 0/? | Not started | - |
 | 20. Claude Orchestrator | v2.0 | 0/? | Not started | - |
