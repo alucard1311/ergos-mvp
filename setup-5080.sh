@@ -1,12 +1,12 @@
 #!/bin/bash
-# Ergos setup for Ubuntu 24.04 + RTX 5080
+# Ergos setup for Ubuntu 24.04 + RTX 5070 Laptop (Blackwell)
 # Usage:
 #   Part 1: bash setup-5080.sh prepare   (installs drivers, reboots)
 #   Part 2: bash setup-5080.sh install    (after reboot, sets up ergos)
 set -euo pipefail
 
 REPO="git@github.com:alucard1311/ergos-mvp.git"
-ERGOS_DIR="$HOME/ergos"
+ERGOS_DIR="$HOME/ergos-mvp"
 
 prepare() {
     echo "=== Part 1: System + NVIDIA Drivers ==="
@@ -19,8 +19,8 @@ prepare() {
         portaudio19-dev libsndfile1 ffmpeg \
         build-essential cmake curl
 
-    # NVIDIA drivers (570 series for RTX 5080)
-    sudo apt install -y nvidia-driver-570
+    # NVIDIA drivers (590 series for RTX 5070 Laptop / Blackwell)
+    sudo apt install -y nvidia-driver-590
 
     echo ""
     echo "=== Drivers installed. Rebooting in 5 seconds... ==="
@@ -36,9 +36,6 @@ install() {
     echo "Checking GPU..."
     nvidia-smi || { echo "ERROR: nvidia-smi failed. Did you reboot after Part 1?"; exit 1; }
     echo ""
-
-    # Install CUDA toolkit
-    sudo apt install -y nvidia-cuda-toolkit
 
     # Clone repo
     if [ ! -d "$ERGOS_DIR" ]; then

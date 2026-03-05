@@ -165,7 +165,7 @@ class TestConcurrentNarrationAndExecution:
         EXECUTION_DELAY = 0.1  # 100ms delay for executor to simulate real work
 
         async def slow_speak(text: str):
-            if text == "Let me read that file.":
+            if text == "Let me take a look at that file for you.":
                 speak_start_time.append(time.monotonic())
                 await asyncio.sleep(EXECUTION_DELAY * 1.5)  # speak is slower
 
@@ -191,12 +191,12 @@ class TestConcurrentNarrationAndExecution:
         )
 
 
-class TestDoneSpokenAfterToolResult:
+class TestNoDoneNarration:
     @pytest.mark.asyncio
-    async def test_done_spoken_after_tool_completes(
+    async def test_no_done_spoken_after_tool(
         self, processor, mock_generator, mock_llm_processor
     ):
-        """'Done.' must be spoken AFTER asyncio.gather(speak, execute) completes."""
+        """'Done.' must NOT be spoken — too short for Orpheus, causes garbled audio."""
         mock_generator.create_chat_completion_sync.side_effect = [
             _make_tool_call_response("file_read", {"path": "/tmp/test.txt"}),
             _make_text_response("All done"),
@@ -209,9 +209,9 @@ class TestDoneSpokenAfterToolResult:
 
         await processor.process("test", record_speak, mock_llm_processor)
 
-        assert "Done." in speak_calls, f"'Done.' never spoken. Speak calls: {speak_calls}"
-        done_idx = speak_calls.index("Done.")
-        assert done_idx > 0, f"'Done.' was the very first speak call — should come after narration. Calls: {speak_calls}"
+        assert "Done." not in speak_calls, f"'Done.' should not be spoken. Speak calls: {speak_calls}"
+        # Only the before-narration should be spoken
+        assert len(speak_calls) == 1, f"Expected 1 speak call (narration only). Got: {speak_calls}"
 
 
 class TestMultiStepChain:
@@ -416,7 +416,7 @@ class TestNarrationMessages:
             system_prompt="test",
         )
 
-        assert "read" in processor._narration_before("file_read").lower()
+        assert "file" in processor._narration_before("file_read").lower()
         assert "run" in processor._narration_before("shell_run").lower() or \
                "command" in processor._narration_before("shell_run").lower()
         assert "file" in processor._narration_before("file_list").lower() or \

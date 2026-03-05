@@ -86,6 +86,13 @@ class _ErgosOrbState extends State<ErgosOrb>
           period: const Duration(milliseconds: 400),
         );
         break;
+      case 'WARMING_UP':
+        // Slow breathe: 2s period to indicate loading/waiting
+        _controller.repeat(
+          reverse: true,
+          period: const Duration(milliseconds: 2000),
+        );
+        break;
       default:
         _controller.stop();
         _controller.value = 0.5;
@@ -109,6 +116,8 @@ class _ErgosOrbState extends State<ErgosOrb>
           return const Color(0xFF4CAF50); // Chef green
         case 'SPEAKING_AND_LISTENING':
           return const Color(0xFF06B6D4); // Cyan (same in kitchen mode for consistency)
+        case 'WARMING_UP':
+          return const Color(0xFFE8853D); // Warm orange glow
         default:
           return const Color(0xFF8B5A2B); // Warm brown
       }
@@ -126,6 +135,8 @@ class _ErgosOrbState extends State<ErgosOrb>
         return const Color(0xFF10B981); // Green
       case 'SPEAKING_AND_LISTENING':
         return const Color(0xFF06B6D4); // Cyan — distinct from green (SPEAKING) and blue (LISTENING)
+      case 'WARMING_UP':
+        return const Color(0xFFE8853D); // Warm orange glow
       default:
         return const Color(0xFF6B7280); // Grey
     }

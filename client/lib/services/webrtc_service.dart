@@ -1,4 +1,7 @@
 import 'dart:convert';
+import 'dart:io' show Platform;
+
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/services.dart';
 import 'package:flutter_webrtc/flutter_webrtc.dart';
 
@@ -6,8 +9,12 @@ import '../models/connection_state.dart';
 import '../utils/permissions.dart';
 import 'signaling_service.dart';
 
-// Platform channel for native audio control
+// Platform channel for native audio control (Android only)
 const _audioChannel = MethodChannel('com.ergos.client/audio');
+
+/// Whether running on desktop (Linux/Windows/macOS).
+bool get _isDesktop =>
+    !kIsWeb && (Platform.isLinux || Platform.isWindows || Platform.isMacOS);
 
 /// Callback type for connection state changes.
 typedef ConnectionStateCallback = void Function(ClientConnectionState state);
@@ -17,6 +24,18 @@ typedef ServerStateCallback = void Function(ServerState state);
 
 /// Callback type for data channel ready state.
 typedef DataChannelReadyCallback = void Function(bool isReady);
+
+/// Callback type for transcription text received from server.
+typedef TranscriptionCallback = void Function(String text);
+
+/// Callback type for meeting recording status from server.
+typedef RecordingStatusCallback = void Function(bool isRecording);
+
+/// Callback type for LLM warm-up status from server.
+typedef WarmupStatusCallback = void Function(String status);
+
+/// Callback type for active LLM model status from server.
+typedef ModelStatusCallback = void Function(String model);
 
 /// Service for managing WebRTC connections to the server.
 ///
@@ -49,6 +68,18 @@ class WebRTCService {
 
   /// Callback for data channel ready state.
   DataChannelReadyCallback? onDataChannelReady;
+
+  /// Callback for transcription text from server.
+  TranscriptionCallback? onTranscription;
+
+  /// Callback for meeting recording status.
+  RecordingStatusCallback? onRecordingStatus;
+
+  /// Callback for LLM warm-up status.
+  WarmupStatusCallback? onWarmupStatus;
+
+  /// Callback for active LLM model status.
+  ModelStatusCallback? onModelStatus;
 
   /// Creates a WebRTCService with the given signaling service.
   WebRTCService(this._signalingService);
@@ -88,16 +119,17 @@ class WebRTCService {
       'video': false,
     });
 
-    // Enable speakerphone using native Android AudioManager
-    try {
-      await _audioChannel.invokeMethod('setSpeakerOn');
-      print('Native audio: Speaker enabled via AudioManager');
-    } catch (e) {
-      print('Native audio error: $e');
+    // Enable speakerphone on mobile (not needed on desktop)
+    if (!_isDesktop) {
+      try {
+        await _audioChannel.invokeMethod('setSpeakerOn');
+        print('Native audio: Speaker enabled via AudioManager');
+      } catch (e) {
+        print('Native audio error: $e');
+      }
+      await Helper.setSpeakerphoneOn(true);
+      print('Audio output configured: speaker mode enabled');
     }
-    // Also try flutter_webrtc helper
-    await Helper.setSpeakerphoneOn(true);
-    print('Audio output configured: speaker mode enabled');
 
     // 3. Create peer connection with STUN
     _pc = await createPeerConnection({
@@ -145,9 +177,11 @@ class WebRTCService {
         // Ensure the track is enabled
         event.track.enabled = true;
 
-        // Configure audio session for playback - route to speaker
-        await Helper.setSpeakerphoneOn(true);
-        print('Audio configured: speakerphone ON');
+        // Configure audio session for playback - route to speaker (mobile only)
+        if (!_isDesktop) {
+          await Helper.setSpeakerphoneOn(true);
+          print('Audio configured: speakerphone ON');
+        }
       }
     };
 
@@ -172,6 +206,22 @@ class WebRTCService {
           final serverState = ServerState.fromJson(data);
           print('State change: ${serverState.state}');
           onServerStateChanged?.call(serverState);
+        } else if (data['type'] == 'transcription') {
+          final text = data['text'] as String? ?? '';
+          print('Transcription: $text');
+          onTranscription?.call(text);
+        } else if (data['type'] == 'recording_status') {
+          final recording = data['recording'] as bool? ?? false;
+          print('Recording status: $recording');
+          onRecordingStatus?.call(recording);
+        } else if (data['type'] == 'warmup_status') {
+          final status = data['status'] as String? ?? '';
+          print('Warmup status: $status');
+          onWarmupStatus?.call(status);
+        } else if (data['type'] == 'model_status') {
+          final model = data['model'] as String? ?? '';
+          print('Model status: $model');
+          onModelStatus?.call(model);
         }
       } catch (e) {
         print('Error parsing data channel message: $e');

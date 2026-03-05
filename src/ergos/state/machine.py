@@ -29,6 +29,7 @@ VALID_TRANSITIONS: dict[ConversationState, set[ConversationState]] = {
     ConversationState.PROCESSING: {
         ConversationState.SPEAKING,  # LLM response ready, start TTS
         ConversationState.LISTENING,  # Barge-in during processing
+        ConversationState.IDLE,  # Stale completion after barge-in / error recovery
     },
     ConversationState.SPEAKING: {
         ConversationState.LISTENING,  # TTS complete or barge-in

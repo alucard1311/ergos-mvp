@@ -114,8 +114,16 @@ class TTSAudioTrack(MediaStreamTrack):
                 else:
                     self._buffer = []
                     self._buffer_samples = 0
+            elif self._buffer_samples > 0:
+                # Fewer than one frame remains — pad with zeros and flush
+                all_samples = np.concatenate(self._buffer)
+                padded = np.zeros(self._samples_per_frame, dtype=all_samples.dtype)
+                padded[:len(all_samples)] = all_samples
+                samples = padded.copy()
+                self._buffer = []
+                self._buffer_samples = 0
             else:
-                # Not enough samples, return silence
+                # Buffer empty, return silence
                 samples = np.zeros(self._samples_per_frame, dtype=np.int16)
 
         # Ensure correct dtype
@@ -169,10 +177,10 @@ class TTSAudioTrack(MediaStreamTrack):
         if samples.dtype == np.float32:
             samples = (samples * 32767).astype(np.int16)
 
-        # Simple 2x upsampling by repeating each sample (24kHz -> 48kHz)
+        # Polyphase 2x upsampling with anti-alias filter (24kHz -> 48kHz)
         if input_sample_rate == 24000 and self._sample_rate == 48000:
-            # Repeat each sample twice: [a, b, c] -> [a, a, b, b, c, c]
-            samples = np.repeat(samples, 2)
+            from scipy.signal import resample_poly
+            samples = resample_poly(samples, 2, 1).astype(samples.dtype)
 
         # Thread-safe buffer operations
         with self._buffer_lock:

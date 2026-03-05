@@ -34,7 +34,7 @@ def setup_logging(verbose: bool) -> None:
     )
 
     # Silence noisy third-party loggers
-    for lib in ["aiortc", "aioice", "av", "PIL", "urllib3"]:
+    for lib in ["aiortc", "aioice", "av", "PIL", "urllib3", "httpx", "httpcore", "faster_whisper"]:
         logging.getLogger(lib).setLevel(third_party_level)
 
 

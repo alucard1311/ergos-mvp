@@ -31,6 +31,11 @@ class LLMConfig(BaseModel):
     device: str = "auto"
     chat_format: str = "chatml"  # Chat template format: chatml (Qwen3), llama-3, etc.
     n_gpu_layers: int = -1  # GPU layers to offload: -1 means all layers
+    # Cloud LLM (RunPod vLLM OpenAI-compatible endpoint)
+    cloud_endpoint_url: Optional[str] = None  # e.g. https://api.runpod.ai/v2/<id>/openai/v1
+    cloud_api_key: Optional[str] = None
+    cloud_model_name: str = "Qwen/Qwen3-32B"
+    cloud_timeout: float = 60.0
 
 
 class TTSConfig(BaseModel):
@@ -84,6 +89,12 @@ class ToolsConfig(BaseModel):
     max_steps: int = 8  # Max agentic loop iterations
 
 
+class MeetingNotesConfig(BaseModel):
+    """Meeting notes plugin configuration."""
+
+    vault_path: str = "~/Documents/ObsidianVault"
+
+
 class Config(BaseModel):
     """Main configuration model for Ergos."""
 
@@ -93,6 +104,7 @@ class Config(BaseModel):
     tts: TTSConfig = Field(default_factory=TTSConfig)
     persona: PersonaConfig = Field(default_factory=PersonaConfig)
     tools: ToolsConfig = Field(default_factory=ToolsConfig)
+    meeting_notes: MeetingNotesConfig = Field(default_factory=MeetingNotesConfig)
 
 
 def load_config(path: Path | str = "config.yaml") -> Config:

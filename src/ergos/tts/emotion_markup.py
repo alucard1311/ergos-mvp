@@ -56,28 +56,36 @@ class EmotionMarkupProcessor:
         result = self._inject_sarcasm_pauses(result)
         return result
 
+    # Maximum emotion tags per synthesis call to prevent erratic tone shifts
+    MAX_EMOTION_TAGS: int = 1
+
     def _convert_emotion_hints(self, text: str) -> str:
         """Convert *hint* patterns to Orpheus tags.
 
         Uses regex to find *word* patterns and map to known tags.
+        Only keeps the first MAX_EMOTION_TAGS known tags — excess tags
+        are stripped to prevent erratic tonal shifts within a sentence.
         Unknown hints are stripped entirely (not spoken by TTS).
 
         Args:
             text: Text containing potential *hint* patterns.
 
         Returns:
-            Text with known hints replaced by tags and unknown hints stripped.
+            Text with first known hint replaced by tag, rest stripped.
         """
+        tag_count = 0
+
         def replace_hint(match: re.Match) -> str:
+            nonlocal tag_count
             word = match.group(1).lower()
             if word in self.EMOTION_MAP:
-                return self.EMOTION_MAP[word]
-            # Unknown hint: strip entirely (remove the *word* from output)
-            return ""
+                if tag_count < self.MAX_EMOTION_TAGS:
+                    tag_count += 1
+                    return self.EMOTION_MAP[word]
+                return ""  # Over limit — strip
+            return ""  # Unknown hint — strip
 
-        # Match *word* patterns (word = one or more word chars)
         result = re.sub(r"\*(\w+)\*", replace_hint, text)
-        # Clean up double spaces that may result from stripping hints
         result = re.sub(r"  +", " ", result).strip()
         return result
 

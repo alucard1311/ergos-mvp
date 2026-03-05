@@ -159,6 +159,54 @@ class DataChannelHandler:
             except Exception as e:
                 logger.error(f"Failed to broadcast to channel: {e}")
 
+    async def broadcast_transcription(self, text: str) -> None:
+        """Broadcast transcription text to all connected data channels."""
+        message = json.dumps({"type": "transcription", "text": text})
+        for channel in list(self._channels):
+            try:
+                if channel.readyState == "open":
+                    channel.send(message)
+            except Exception as e:
+                logger.error(f"Failed to broadcast transcription: {e}")
+
+    async def broadcast_model_status(self, model: str) -> None:
+        """Broadcast which LLM model is active to all connected data channels.
+
+        Args:
+            model: Either "cloud" or "local".
+        """
+        message = json.dumps({"type": "model_status", "model": model})
+        for channel in list(self._channels):
+            try:
+                if channel.readyState == "open":
+                    channel.send(message)
+            except Exception as e:
+                logger.error(f"Failed to broadcast model status: {e}")
+
+    async def broadcast_warmup_status(self, status: str) -> None:
+        """Broadcast LLM warm-up status to all connected data channels.
+
+        Args:
+            status: One of "started", "ready", or "failed".
+        """
+        message = json.dumps({"type": "warmup_status", "status": status})
+        for channel in list(self._channels):
+            try:
+                if channel.readyState == "open":
+                    channel.send(message)
+            except Exception as e:
+                logger.error(f"Failed to broadcast warmup status: {e}")
+
+    async def broadcast_recording_status(self, recording: bool) -> None:
+        """Broadcast meeting recording status to all connected data channels."""
+        message = json.dumps({"type": "recording_status", "recording": recording})
+        for channel in list(self._channels):
+            try:
+                if channel.readyState == "open":
+                    channel.send(message)
+            except Exception as e:
+                logger.error(f"Failed to broadcast recording status: {e}")
+
     def get_state_callback(self) -> Callable[[StateChangeEvent], None]:
         """
         Get a callback for state machine registration.

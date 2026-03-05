@@ -96,13 +96,13 @@ class TestEmotionHintConversion:
         assert "*waves*" not in result
         assert "waves" not in result  # The word itself should also be gone
 
-    def test_multiple_emotion_hints_in_one_sentence(self):
-        """Multiple hints in one sentence should all be converted."""
+    def test_multiple_emotion_hints_rate_limited(self):
+        """Only first emotion hint kept; excess stripped to prevent erratic tone shifts."""
         result = self.processor.process(
             "That is hilarious *laughs* and then I *sighs* at the end", engine="orpheus"
         )
         assert "<laugh>" in result
-        assert "<sigh>" in result
+        assert "<sigh>" not in result  # second tag stripped (rate limit = 1)
         assert "*laughs*" not in result
         assert "*sighs*" not in result
 

@@ -87,8 +87,8 @@ Requirements for TARS milestone. Each maps to roadmap phases (13+).
 ### Agentic Execution
 
 - [x] **AGENT-01**: AI can call tools (file operations, shell commands, web search) via LLM function calling
-- [ ] **AGENT-02**: AI narrates what it's doing during tool execution ("Let me check that...")
-- [ ] **AGENT-03**: AI can chain multiple tools to complete multi-step workflows
+- [x] **AGENT-02**: AI narrates what it's doing during tool execution ("Let me check that...")
+- [x] **AGENT-03**: AI can chain multiple tools to complete multi-step workflows
 - [x] **AGENT-04**: Tool registry allows adding new tools without code changes
 
 ### Vision
@@ -203,8 +203,8 @@ Deferred to future release. Tracked but not in current roadmap.
 | PERS-02 | Phase 16 | Complete |
 | PERS-03 | Phase 16 | Complete |
 | AGENT-01 | Phase 17 | Complete |
-| AGENT-02 | Phase 17 | Pending |
-| AGENT-03 | Phase 17 | Pending |
+| AGENT-02 | Phase 17 | Complete |
+| AGENT-03 | Phase 17 | Complete |
 | AGENT-04 | Phase 17 | Complete |
 | VIS-01 | Phase 18 | Pending |
 | VIS-02 | Phase 18 | Pending |

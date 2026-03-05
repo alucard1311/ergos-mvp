@@ -1,4 +1,4 @@
-"""TARS prompt builder with section-based sarcasm blending.
+"""Ergos prompt builder with section-based sarcasm blending.
 
 Implements Pattern 1 (section-based blending) from Phase 16 research:
 - Two template tiers: NEUTRAL (0%) and MAX_SARCASM (100%)
@@ -14,47 +14,50 @@ from datetime import datetime
 # Section templates — sarcasm level 0 (neutral / serious mission mode)
 # ---------------------------------------------------------------------------
 
-TARS_NEUTRAL_SECTIONS = {
+ERGOS_NEUTRAL_SECTIONS = {
     "identity": (
         "You are {name}, a highly capable AI assistant. "
         "You are competent, direct, and precise."
     ),
     "style": (
-        "Keep responses to 1-3 sentences. No markdown. "
-        "Answer the question clearly and move on."
+        "Your output is spoken aloud by a text-to-speech engine. "
+        "No markdown, bullet points, or numbered lists. "
+        "Answer the question clearly and concisely."
     ),
     "emotion": "Omit emotion hints — this is serious mission mode.",
     "humor": "",  # No humor at 0%
 }
 
 # ---------------------------------------------------------------------------
-# Section templates — sarcasm level 100 (full TARS deadpan)
+# Section templates — sarcasm level 100 (full Ergos deadpan)
 # ---------------------------------------------------------------------------
 
-TARS_MAX_SARCASM_SECTIONS = {
+ERGOS_MAX_SARCASM_SECTIONS = {
     "identity": (
         "You are {name}, a highly capable AI assistant with a dry wit — "
-        "like the TARS robot from Interstellar. Your humor is deadpan and always "
+        "with a dry wit and deadpan humor. Your humor is always "
         "understated, never mean-spirited."
     ),
     "style": (
-        "Keep responses to 1-3 sentences. No markdown. "
-        "Deliver information with precision and the occasional dry observation."
+        "Your output is spoken aloud by a text-to-speech engine. "
+        "No markdown, bullet points, or numbered lists. "
+        "Always answer the user's question with real substance first, "
+        "then add personality. A witty non-answer is still a non-answer."
     ),
     "emotion": (
-        "Use emotion hints strategically for comedic timing: *sighs* for mild exasperation, "
-        "*chuckles* for dry amusement, and ellipsis (...) for dramatic pauses. "
-        "Use sparingly — restraint is funnier than excess."
+        "You may use ONE emotion hint per response at most — *sighs* or *chuckles* — "
+        "placed at the start for tone-setting. Never scatter multiple hints across a response. "
+        "Use ellipsis (...) for dramatic pauses instead of emotion tags."
     ),
     "humor": (
-        "Inject dry humor on every response. Understatement is your weapon. "
-        "Irony and deadpan delivery should feel natural, not forced."
+        "Inject dry humor naturally. Understatement is your weapon. "
+        "But never sacrifice a real answer for the sake of a joke."
     ),
 }
 
 
-class TARSPromptBuilder:
-    """Builds TARS system prompts with sarcasm level blending.
+class ErgosPromptBuilder:
+    """Builds Ergos system prompts with sarcasm level blending.
 
     Supports three tiers:
     - Level 0-20: Neutral (no humor, serious mission mode)
@@ -68,14 +71,16 @@ class TARSPromptBuilder:
         sarcasm_level: int,
         memories: list[str],
         time_context: str,
+        capabilities: list[str] | None = None,
     ) -> str:
-        """Build a complete TARS system prompt.
+        """Build a complete Ergos system prompt.
 
         Args:
             name: Assistant name to substitute into the identity section.
             sarcasm_level: Integer 0-100 controlling humor intensity.
             memories: List of user memory strings to inject into the prompt.
             time_context: Natural-language time descriptor (e.g. "It is the morning on a Tuesday.").
+            capabilities: Optional list of capability descriptions (tools, plugins, voice commands).
 
         Returns:
             Complete system prompt string ready for LLM configuration.
@@ -99,6 +104,13 @@ class TARSPromptBuilder:
         if sections["humor"]:
             parts.append(sections["humor"])
 
+        # Capabilities injection
+        if capabilities:
+            cap_block = "What you can do:\n" + "\n".join(
+                f"- {c}" for c in capabilities
+            )
+            parts.append(cap_block)
+
         # Time context injection
         if time_context:
             parts.append(time_context)
@@ -115,19 +127,19 @@ class TARSPromptBuilder:
     def _select_sections(self, sarcasm_level: int) -> dict[str, str]:
         """Select and return sections dict for the given sarcasm level."""
         if sarcasm_level <= 20:
-            return TARS_NEUTRAL_SECTIONS.copy()
+            return ERGOS_NEUTRAL_SECTIONS.copy()
 
         if sarcasm_level >= 80:
-            return TARS_MAX_SARCASM_SECTIONS.copy()
+            return ERGOS_MAX_SARCASM_SECTIONS.copy()
 
         # Mid-range (21-79): use max identity/style, modulate humor frequency
         frequency = "most" if sarcasm_level >= 50 else "some"
         sections = {
-            "identity": TARS_MAX_SARCASM_SECTIONS["identity"],
-            "style": TARS_MAX_SARCASM_SECTIONS["style"],
-            "emotion": TARS_MAX_SARCASM_SECTIONS["emotion"],
+            "identity": ERGOS_MAX_SARCASM_SECTIONS["identity"],
+            "style": ERGOS_MAX_SARCASM_SECTIONS["style"],
+            "emotion": ERGOS_MAX_SARCASM_SECTIONS["emotion"],
             "humor": (
-                f"Inject dry humor in {frequency} responses. "
+                f"Add dry humor to {frequency} responses, but always answer the question first. "
                 "Understatement and deadpan delivery work best."
             ),
         }

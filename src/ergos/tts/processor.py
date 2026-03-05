@@ -2,7 +2,10 @@
 
 import asyncio
 import logging
+import re
 from dataclasses import dataclass, field
+
+import numpy as np
 
 from .emotion_markup import EmotionMarkupProcessor
 from .synthesizer import TTSSynthesizer
@@ -30,6 +33,9 @@ class TTSProcessor:
     # Sentence boundary characters
     sentence_endings: str = ".!?"
 
+    # Silence gap between sentences (ms) for natural pacing
+    inter_sentence_pause_ms: int = 120
+
     # Internal state (not init parameters)
     _emotion_markup: EmotionMarkupProcessor = field(default_factory=EmotionMarkupProcessor, init=False)
     _buffer: str = field(default="", init=False)
@@ -38,17 +44,34 @@ class TTSProcessor:
     _synthesis_lock: asyncio.Lock = field(default_factory=asyncio.Lock, init=False)  # Serialize synthesis calls
     _is_synthesizing: bool = field(default=False, init=False)  # Track if synthesis is in progress
     _total_audio_duration_ms: float = field(default=0.0, init=False)  # Track total audio generated
+    _inside_think: bool = field(default=False, init=False)  # Track <think> blocks
 
     async def receive_token(self, token: str) -> None:
         """Receive a token from LLM and process when sentence complete.
 
         This method is designed to be registered as a token callback
         with LLMProcessor.add_token_callback().
+        Filters out <think>...</think> reasoning blocks from Qwen3.
 
         Args:
             token: A text token from the LLM stream.
         """
         self._buffer += token
+
+        # Filter out <think>...</think> blocks (Qwen3 reasoning)
+        if "<think>" in self._buffer:
+            self._inside_think = True
+        if self._inside_think:
+            # Check if the closing tag has arrived
+            if "</think>" in self._buffer:
+                # Strip the entire think block
+                self._buffer = re.sub(
+                    r"<think>.*?</think>", "", self._buffer, flags=re.DOTALL
+                )
+                self._inside_think = False
+            else:
+                # Still inside think block, don't process yet
+                return
         logger.debug(f"TTS: Received token, buffer now: '{self._buffer[:50]}...'")
 
         # Check for sentence boundary
@@ -58,44 +81,103 @@ class TTSProcessor:
                 logger.info(f"TTS: Complete sentence, synthesizing: '{sentence[:50]}...'")
                 await self._synthesize_and_stream(sentence)
 
+    # Minimum characters of actual text (letters/digits) before synthesizing.
+    # Prevents tiny fragments like "..." or "*sighs*" from being synthesized
+    # individually, which is slow on Orpheus and produces garbled audio.
+    _MIN_SPEAKABLE_CHARS: int = 20
+
     def _has_complete_sentence(self) -> bool:
-        """Check if buffer contains a complete sentence.
+        """Check if buffer contains a complete sentence ready to synthesize.
+
+        Uses _find_sentence_boundary() which scans forward through boundaries
+        until finding one with enough speakable content.
 
         Returns:
-            True if a sentence ending is found at end or followed by space.
+            True if a synthesizable sentence is found.
         """
+        return self._find_sentence_boundary() >= 0
+
+    def _find_next_raw_boundary(self, buf: str, from_pos: int = 0) -> int:
+        """Find the next sentence-ending boundary at or after from_pos.
+
+        Returns:
+            Index of the sentence-ending character, or -1 if none found.
+        """
+        earliest_idx = -1
         for char in self.sentence_endings:
-            if char in self._buffer:
-                # Make sure there's content after the ending (or it's at end)
-                idx = self._buffer.rfind(char)
-                # Allow for trailing space or end of buffer
-                if idx == len(self._buffer) - 1 or self._buffer[idx + 1] == " ":
-                    return True
-        return False
+            idx = buf.find(char, from_pos)
+            if idx == -1:
+                continue
+            # Must be at end or followed by space
+            if idx < len(buf) - 1 and buf[idx + 1] != " ":
+                continue
+            # For dots, skip past consecutive dots (ellipsis)
+            if char == ".":
+                while idx + 1 < len(buf) and buf[idx + 1] == ".":
+                    idx += 1
+                # If at buffer end, more dots might be coming
+                if idx == len(buf) - 1:
+                    dot_start = idx
+                    while dot_start > 0 and buf[dot_start - 1] == ".":
+                        dot_start -= 1
+                    if idx - dot_start >= 2:
+                        continue
+            if earliest_idx < 0 or idx < earliest_idx:
+                earliest_idx = idx
+        return earliest_idx
+
+    def _find_sentence_boundary(self) -> int:
+        """Find a sentence boundary with enough speakable text.
+
+        Scans forward through sentence boundaries. If the first boundary's
+        text has fewer than _MIN_SPEAKABLE_CHARS alphanumeric characters,
+        continues to the next boundary and checks the cumulative text.
+        This prevents short opening sentences (e.g., "Here's one.") from
+        blocking synthesis of all subsequent text.
+
+        Returns:
+            Index of the chosen sentence-ending character, or -1 if none found.
+        """
+        buf = self._buffer
+        search_from = 0
+        while search_from < len(buf):
+            idx = self._find_next_raw_boundary(buf, search_from)
+            if idx < 0:
+                return -1
+            # Check speakable content from start of buffer to this boundary
+            candidate = buf[: idx + 1]
+            speakable = sum(1 for c in candidate if c.isalnum())
+            if speakable >= self._MIN_SPEAKABLE_CHARS:
+                return idx
+            # Not enough content yet, scan forward to next boundary
+            search_from = idx + 1
+        return -1
 
     def _extract_sentence(self) -> str:
-        """Extract first complete sentence from buffer.
+        """Extract text up to the first viable sentence boundary.
+
+        Uses _find_sentence_boundary() (same as _has_complete_sentence)
+        so the check and extraction always agree on the split point.
 
         Returns:
-            The extracted sentence including its ending punctuation.
+            The extracted text including its ending punctuation.
         """
-        earliest_idx = len(self._buffer)
-        for char in self.sentence_endings:
-            idx = self._buffer.find(char)
-            if idx != -1 and idx < earliest_idx:
-                earliest_idx = idx
+        idx = self._find_sentence_boundary()
+        if idx < 0:
+            return ""
+        sentence = self._buffer[: idx + 1]
+        self._buffer = self._buffer[idx + 1 :].lstrip()
+        return sentence
 
-        if earliest_idx < len(self._buffer):
-            sentence = self._buffer[: earliest_idx + 1]
-            self._buffer = self._buffer[earliest_idx + 1 :].lstrip()
-            return sentence
-        return ""
-
-    async def _synthesize_and_stream(self, text: str) -> None:
+    async def _synthesize_and_stream(self, text: str, is_final: bool = False) -> None:
         """Synthesize text and stream audio to callbacks.
+
+        Strips leading/trailing whitespace and skips empty/whitespace-only text
+        to avoid sending garbage to the TTS engine.
 
         Args:
             text: The text to synthesize.
+            is_final: If True, skip inter-sentence silence (last sentence).
 
         Note:
             Uses a lock to serialize synthesis calls. This prevents multiple
@@ -107,6 +189,12 @@ class TTSProcessor:
             synthesis, this method will stop yielding audio chunks.
             Also handles CancelledError from external task cancellation.
         """
+        # Strip whitespace — LLM output often starts with \n\n
+        text = text.strip()
+        if not text:
+            logger.debug("TTS: Skipping empty text after stripping")
+            return
+
         # Apply emotion markup preprocessing (Orpheus only; Kokoro/CSM get passthrough)
         text = self._emotion_markup.process(text, engine=self.engine)
 
@@ -125,6 +213,7 @@ class TTSProcessor:
                 return
 
             self._is_synthesizing = True
+            last_sample_rate = 0
             try:
                 async for samples, sample_rate in self.synthesizer.synthesize_stream(
                     text, self.config
@@ -133,6 +222,8 @@ class TTSProcessor:
                     if self._cancelled:
                         logger.info("TTS: Synthesis cancelled, stopping stream")
                         return
+
+                    last_sample_rate = sample_rate
 
                     # Track audio duration
                     chunk_duration_ms = (len(samples) / sample_rate) * 1000
@@ -149,14 +240,45 @@ class TTSProcessor:
             finally:
                 self._is_synthesizing = False
 
+            # Insert silence between sentences for natural pacing (skip after final sentence)
+            if not is_final and not self._cancelled and self.inter_sentence_pause_ms > 0 and last_sample_rate > 0:
+                n_silence = int(last_sample_rate * self.inter_sentence_pause_ms / 1000)
+                # Comfort noise at -62dBFS instead of digital silence
+                noise_amplitude = 0.0008
+                silence = np.random.normal(0, noise_amplitude, n_silence).astype(np.float32)
+                silence = np.clip(silence, -noise_amplitude * 4, noise_amplitude * 4)
+                for callback in self._audio_callbacks:
+                    try:
+                        await callback(silence, last_sample_rate)
+                    except Exception as e:
+                        logger.error(f"Audio callback error (silence): {e}")
+
     async def flush(self) -> None:
         """Synthesize any remaining text in buffer.
 
         Call this after LLM generation completes to ensure any
         partial sentence in the buffer gets synthesized.
+        Strips any incomplete <think> blocks that were never closed
+        (e.g., when the LLM hit max_tokens mid-reasoning).
         """
+        # If still inside a think block that never closed, discard it
+        if self._inside_think:
+            # Strip the incomplete <think> block from buffer
+            idx = self._buffer.find("<think>")
+            if idx != -1:
+                self._buffer = self._buffer[:idx]
+            else:
+                self._buffer = ""
+            self._inside_think = False
+            logger.info("TTS: Stripped incomplete <think> block at flush")
+
+        # Also strip any complete think blocks that might remain
+        self._buffer = re.sub(
+            r"<think>.*?</think>", "", self._buffer, flags=re.DOTALL
+        )
+
         if self._buffer.strip():
-            await self._synthesize_and_stream(self._buffer)
+            await self._synthesize_and_stream(self._buffer, is_final=True)
             self._buffer = ""
 
     def clear_buffer(self) -> None:
@@ -183,17 +305,33 @@ class TTSProcessor:
         """
         self._cancelled = True
         self._buffer = ""
+        self._inside_think = False
         logger.info("TTS: Synthesis cancelled")
 
         # Yield to allow any pending synthesis to check the cancellation flag
         await asyncio.sleep(0)
 
     def reset_cancellation(self) -> None:
-        """Reset the cancellation flag.
+        """Reset the cancellation flag and think-block tracking.
 
         Call this when starting a new utterance to allow synthesis.
+        Also resets _inside_think to prevent stale think-block state
+        from a previous utterance silently discarding TTS output at flush().
         """
         self._cancelled = False
+        self._inside_think = False
+
+    def reset_state(self) -> None:
+        """Full reset of all TTS processing state.
+
+        Call this on new connection or session start to clear all flags
+        that could cause stale state to bleed across sessions.
+        """
+        self._cancelled = False
+        self._inside_think = False
+        self._buffer = ""
+        self._total_audio_duration_ms = 0.0
+        logger.debug("TTS: Full state reset")
 
     # Callback registration methods
 

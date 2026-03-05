@@ -86,13 +86,19 @@ class TestLLMProcessorChatFormat:
         assert "<|im_start|>assistant" in prompt
 
     def test_build_prompt_chatml_format_exact_structure(self):
-        """_build_prompt generates exact chatml template structure."""
+        """_build_prompt generates exact chatml template structure.
+
+        /no_think must be appended to the last USER message (not the system
+        message) — Qwen3 only recognizes the control token in the user turn.
+        """
         proc = self._make_processor(chat_format="chatml")
         proc._history = [Message(role="user", content="Hello")]
         prompt = proc._build_prompt()
 
+        # System block has NO /no_think (it would be ignored there by Qwen3)
         expected_system = "<|im_start|>system\nYou are a test assistant.<|im_end|>"
-        expected_user = "<|im_start|>user\nHello<|im_end|>"
+        # /no_think is appended to the last user message
+        expected_user = "<|im_start|>user\nHello /no_think<|im_end|>"
         expected_assistant_start = "<|im_start|>assistant\n"
 
         assert expected_system in prompt
@@ -100,7 +106,11 @@ class TestLLMProcessorChatFormat:
         assert prompt.endswith(expected_assistant_start)
 
     def test_build_prompt_chatml_multi_turn_history(self):
-        """_build_prompt generates chatml format with multi-turn conversation."""
+        """_build_prompt generates chatml format with multi-turn conversation.
+
+        /no_think is only appended to the LAST user message — earlier user
+        turns are left unchanged so the history reads naturally.
+        """
         proc = self._make_processor(chat_format="chatml")
         proc._history = [
             Message(role="user", content="What is 2+2?"),
@@ -109,9 +119,11 @@ class TestLLMProcessorChatFormat:
         ]
         prompt = proc._build_prompt()
 
+        # Earlier user turns are unchanged
         assert "<|im_start|>user\nWhat is 2+2?<|im_end|>" in prompt
         assert "<|im_start|>assistant\nIt is 4.<|im_end|>" in prompt
-        assert "<|im_start|>user\nAnd 3+3?<|im_end|>" in prompt
+        # Last user turn has /no_think appended
+        assert "<|im_start|>user\nAnd 3+3? /no_think<|im_end|>" in prompt
         # Ends with assistant turn
         assert prompt.endswith("<|im_start|>assistant\n")
 

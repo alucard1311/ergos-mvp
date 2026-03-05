@@ -5,10 +5,17 @@ llm:
   max_tokens: 512
   model_path: ~/.ergos/models/Qwen3-8B-Q4_K_M.gguf
   n_gpu_layers: -1
+  # Cloud LLM (RunPod vLLM OpenAI-compatible endpoint)
+  cloud_endpoint_url: https://api.groq.com/openai/v1
+  cloud_api_key: ${GROQ_API_KEY}
+  cloud_model_name: qwen/qwen3-32b
+  cloud_timeout: 30.0
 tools:
   enabled: true
   tools_dir: "~/.ergos/tools"
   max_steps: 8
+meeting_notes:
+  vault_path: "~/Documents/ObsidianVault"
 persona:
   name: Ergos
   persona_file: null

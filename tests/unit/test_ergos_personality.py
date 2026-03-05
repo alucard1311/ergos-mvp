@@ -1,7 +1,7 @@
-"""Unit tests for TARS personality infrastructure.
+"""Unit tests for Ergos personality infrastructure.
 
-Tests for TARSPromptBuilder, try_sarcasm_command, get_time_context,
-PersonaConfig sarcasm_level field, and TARS default persona.
+Tests for ErgosPromptBuilder, try_sarcasm_command, get_time_context,
+PersonaConfig sarcasm_level field, and Ergos default persona.
 """
 
 from datetime import datetime
@@ -10,27 +10,27 @@ from unittest.mock import patch
 import pytest
 import pydantic
 
-from ergos.persona.builder import TARSPromptBuilder, get_time_context, try_sarcasm_command
+from ergos.persona.builder import ErgosPromptBuilder, get_time_context, try_sarcasm_command
 from ergos.persona.loader import DEFAULT_PERSONA, load_persona
 from ergos.config import PersonaConfig
 
 
 class TestPromptBuilder:
-    """Tests for TARSPromptBuilder.build()."""
+    """Tests for ErgosPromptBuilder.build()."""
 
     def setup_method(self):
-        self.builder = TARSPromptBuilder()
+        self.builder = ErgosPromptBuilder()
 
     def test_neutral_prompt_has_no_humor(self):
         """Sarcasm level 0 produces a neutral prompt with no humor section."""
         prompt = self.builder.build(
-            name="TARS",
+            name="Ergos",
             sarcasm_level=0,
             memories=[],
             time_context="",
         )
         # Identity: competent, direct
-        assert "TARS" in prompt
+        assert "Ergos" in prompt
         assert "competent" in prompt.lower() or "capable" in prompt.lower() or "direct" in prompt.lower()
         # No humor section
         assert "humor" not in prompt.lower() and "wit" not in prompt.lower() and "funny" not in prompt.lower()
@@ -38,7 +38,7 @@ class TestPromptBuilder:
     def test_max_sarcasm_prompt_has_humor(self):
         """Sarcasm level 100 produces a prompt with humor, deadpan style, emotion hints guidance."""
         prompt = self.builder.build(
-            name="TARS",
+            name="Ergos",
             sarcasm_level=100,
             memories=[],
             time_context="",
@@ -51,7 +51,7 @@ class TestPromptBuilder:
     def test_mid_sarcasm_prompt(self):
         """Sarcasm level 50 produces a prompt with a frequency modifier for humor."""
         prompt = self.builder.build(
-            name="TARS",
+            name="Ergos",
             sarcasm_level=50,
             memories=[],
             time_context="",
@@ -63,7 +63,7 @@ class TestPromptBuilder:
         """When memories list is non-empty, the prompt contains the memory block."""
         memories = ["likes dark coffee", "works late"]
         prompt = self.builder.build(
-            name="TARS",
+            name="Ergos",
             sarcasm_level=75,
             memories=memories,
             time_context="",
@@ -75,7 +75,7 @@ class TestPromptBuilder:
     def test_empty_memories_omitted(self):
         """When memories list is empty, no memory block appears in the prompt."""
         prompt = self.builder.build(
-            name="TARS",
+            name="Ergos",
             sarcasm_level=75,
             memories=[],
             time_context="",
@@ -83,7 +83,7 @@ class TestPromptBuilder:
         assert "What you know about the user:" not in prompt
 
     def test_name_substitution(self):
-        """Custom name is used instead of TARS in the prompt."""
+        """Custom name is used instead of Ergos in the prompt."""
         prompt = self.builder.build(
             name="Jarvis",
             sarcasm_level=75,
@@ -91,15 +91,14 @@ class TestPromptBuilder:
             time_context="",
         )
         assert "Jarvis" in prompt
-        # "TARS" should not appear as the persona name
-        # (May appear in reference text like "like the TARS robot" — that's acceptable)
+        # "Ergos" should not appear as the persona name
         assert "You are Jarvis" in prompt
 
     def test_time_context_injected(self):
         """When time_context is given, the prompt contains it."""
         time_ctx = "It is the morning on a Monday."
         prompt = self.builder.build(
-            name="TARS",
+            name="Ergos",
             sarcasm_level=75,
             memories=[],
             time_context=time_ctx,
@@ -179,16 +178,16 @@ class TestTimeContext:
         assert "late at night" in result_23
 
 
-class TestTARSPersona:
-    """Tests for TARS as the default persona."""
+class TestErgosPersona:
+    """Tests for Ergos as the default persona."""
 
-    def test_tars_is_default(self):
-        """When no persona_file is set, DEFAULT_PERSONA is TARS with is_tars_persona=True."""
-        assert DEFAULT_PERSONA.name == "TARS"
-        assert DEFAULT_PERSONA.is_tars_persona is True
+    def test_ergos_is_default(self):
+        """When no persona_file is set, DEFAULT_PERSONA is Ergos with is_ergos_persona=True."""
+        assert DEFAULT_PERSONA.name == "Ergos"
+        assert DEFAULT_PERSONA.is_ergos_persona is True
 
     def test_custom_persona_file_overrides_default(self, tmp_path):
-        """When persona_file is set, load_persona loads from file (TARS default not forced)."""
+        """When persona_file is set, load_persona loads from file (Ergos default not forced)."""
         persona_yaml = tmp_path / "custom.yaml"
         persona_yaml.write_text(
             "name: Aria\n"
@@ -200,4 +199,4 @@ class TestTARSPersona:
         )
         persona = load_persona(persona_yaml)
         assert persona.name == "Aria"
-        assert persona.is_tars_persona is False
+        assert persona.is_ergos_persona is False

@@ -44,6 +44,7 @@ class LLMProcessor:
     # Configuration
     max_history_messages: int = 10  # Keep last N messages for context
     max_context_tokens: int = 1500  # Reserve tokens for history
+    max_tokens: int = 512           # Max generation tokens per response
     chat_format: str = "chatml"     # Chat template format: "chatml" (Qwen3) or "phi3" (legacy)
 
     # Internal state (not init parameters)
@@ -72,6 +73,7 @@ class LLMProcessor:
 
         # Build generation config with format-appropriate stop sequences
         gen_config = GenerationConfig(
+            max_tokens=self.max_tokens,
             stop_sequences=self._get_stop_sequences(),
         )
 
@@ -137,14 +139,24 @@ class LLMProcessor:
     def _build_chatml_prompt(self) -> str:
         """Build prompt in chatml format (Qwen3).
 
+        Appends /no_think to the LAST USER message (not the system message)
+        to disable Qwen3's chain-of-thought reasoning. Qwen3 only recognizes
+        /no_think in the user turn — placing it in the system message does not
+        suppress the <think> block and wastes the token budget.
+
         Returns:
             Formatted chatml prompt string.
         """
         parts = [f"<|im_start|>system\n{self.system_prompt}<|im_end|>"]
 
-        for msg in self._history[-self.max_history_messages :]:
+        history = self._history[-self.max_history_messages :]
+        for i, msg in enumerate(history):
             role = "user" if msg.role == "user" else "assistant"
-            parts.append(f"<|im_start|>{role}\n{msg.content}<|im_end|>")
+            content = msg.content
+            # Append /no_think to the last user message only
+            if role == "user" and i == len(history) - 1:
+                content = f"{content} /no_think"
+            parts.append(f"<|im_start|>{role}\n{content}<|im_end|>")
 
         parts.append("<|im_start|>assistant\n")
         return "\n".join(parts)

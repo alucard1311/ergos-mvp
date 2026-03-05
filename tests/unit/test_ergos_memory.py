@@ -1,4 +1,4 @@
-"""Unit tests for TARS cross-session memory module.
+"""Unit tests for Ergos cross-session memory module.
 
 Tests MemoryStore CRUD, prune, budget, and extraction parsing.
 """

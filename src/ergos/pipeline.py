@@ -17,6 +17,8 @@ from ergos.core.vram import VRAMMonitor
 from ergos.metrics import LatencyTracker
 from ergos.llm.generator import LLMGenerator
 from ergos.llm.processor import LLMProcessor
+from ergos.llm.cloud_generator import CloudLLMGenerator
+from ergos.llm.fallback_generator import FallbackLLMGenerator
 from ergos.plugins import PluginManager
 from ergos.persona.loader import DEFAULT_PERSONA, load_persona
 from ergos.persona.builder import ErgosPromptBuilder, get_time_context, try_sarcasm_command
@@ -188,9 +190,12 @@ class Pipeline:
         )
 
         # LLM model (llama.cpp) — must finish before Orpheus starts
-        await loop.run_in_executor(
-            None, self.llm_processor.generator._ensure_model
-        )
+        # FallbackLLMGenerator wraps cloud+local; CloudLLMGenerator has no local model
+        gen = self.llm_processor.generator
+        if hasattr(gen, '_local'):
+            gen = gen._local
+        if hasattr(gen, '_ensure_model'):
+            await loop.run_in_executor(None, gen._ensure_model)
 
         # TTS model (Orpheus/Kokoro) — also uses llama.cpp, load after LLM
         await loop.run_in_executor(
@@ -309,41 +314,62 @@ async def create_pipeline(config: Config) -> Pipeline:
         )
     # else: system_prompt already set from persona.system_prompt or inline config (existing behavior unchanged)
 
-    # Create LLM generator if model path is configured
+    # Create LLM generator(s) based on config:
+    # - Both model_path + cloud_endpoint_url → FallbackGenerator (cloud-first, local fallback)
+    # - Only model_path → Local LLMGenerator (current behavior)
+    # - Only cloud_endpoint_url → CloudLLMGenerator (cloud only)
     llm_processor: Optional[LLMProcessor] = None
+    local_generator = None
+    cloud_generator = None
+
     if config.llm.model_path:
-        generator = LLMGenerator(
+        local_generator = LLMGenerator(
             model_path=config.llm.model_path,
             n_ctx=config.llm.context_length,
             n_gpu_layers=config.llm.n_gpu_layers,
             chat_format=config.llm.chat_format,
         )
-        llm_processor = LLMProcessor(
-            generator=generator,
-            system_prompt=system_prompt,
-            max_tokens=config.llm.max_tokens,
+
+    if config.llm.cloud_endpoint_url:
+        cloud_generator = CloudLLMGenerator(
+            endpoint_url=config.llm.cloud_endpoint_url,
+            api_key=config.llm.cloud_api_key or "",
+            model_name=config.llm.cloud_model_name,
+            timeout=config.llm.cloud_timeout,
             chat_format=config.llm.chat_format,
+            n_ctx=config.llm.context_length,
+            max_tokens=config.llm.max_tokens,
         )
-        logger.debug("Created LLM processor")
+
+    if cloud_generator and local_generator:
+        generator = FallbackLLMGenerator(cloud_generator, local_generator)
+        logger.info("LLM: Cloud-first with local fallback")
+    elif cloud_generator:
+        generator = cloud_generator
+        logger.info("LLM: Cloud only (no local fallback)")
+    elif local_generator:
+        generator = local_generator
+        logger.info("LLM: Local only")
     else:
-        logger.warning("No LLM model path configured - LLM processing disabled")
-        # Create a placeholder processor for the pipeline structure
-        # In real use, the model path should be configured
+        logger.warning("No LLM model path or cloud endpoint configured - LLM processing disabled")
         generator = LLMGenerator(
             model_path="",  # Will fail on first use if called
             n_ctx=config.llm.context_length,
             n_gpu_layers=config.llm.n_gpu_layers,
             chat_format=config.llm.chat_format,
         )
-        llm_processor = LLMProcessor(
-            generator=generator,
-            system_prompt=system_prompt,
-            max_tokens=config.llm.max_tokens,
-            chat_format=config.llm.chat_format,
-        )
+
+    llm_processor = LLMProcessor(
+        generator=generator,
+        system_prompt=system_prompt,
+        max_tokens=config.llm.max_tokens,
+        chat_format=config.llm.chat_format,
+    )
+    logger.debug("Created LLM processor")
 
     # 4b. Instantiate tool execution infrastructure (if enabled)
     tool_processor = None
+    tool_registry = None
     if config.tools.enabled and config.llm.model_path:
         from ergos.tools import ToolRegistry, ToolExecutor
         from ergos.llm.tool_processor import ToolCallProcessor
@@ -424,6 +450,18 @@ async def create_pipeline(config: Config) -> Pipeline:
         state_machine=state_machine,
     )
     logger.debug("Created data channel handler")
+
+    # Wire model change callback (FallbackLLMGenerator -> client notification)
+    # Uses call_soon_threadsafe because fallback can trigger from sync thread context
+    if isinstance(generator, FallbackLLMGenerator):
+        _loop = asyncio.get_event_loop()
+        def _on_model_change(model: str) -> None:
+            _loop.call_soon_threadsafe(
+                asyncio.ensure_future,
+                data_handler.broadcast_model_status(model),
+            )
+        generator.set_on_model_change(_on_model_change)
+        logger.debug("Wired: fallback generator model change -> data channel broadcast")
 
     # 8. Create latency tracker
     latency_tracker = LatencyTracker()
@@ -926,6 +964,51 @@ async def create_pipeline(config: Config) -> Pipeline:
     )
     logger.debug("Attached plugins to Ergos components")
 
+    # Wire meeting notes plugin with transcriber, vault path, and recording broadcast
+    meeting_plugin = plugin_manager.get_plugin("meeting_notes")
+    if meeting_plugin is not None:
+        meeting_plugin.set_transcriber(stt_processor.transcriber)
+        meeting_plugin.set_broadcast_recording(data_handler.broadcast_recording_status)
+        if hasattr(config, "meeting_notes"):
+            meeting_plugin.set_vault_path(config.meeting_notes.vault_path)
+
+    # Build capabilities list and inject into system prompt
+    known_capabilities: list[str] = []
+    if prompt_builder is not None:
+        # Tools from registry
+        if tool_registry is not None and tool_processor is not None and tool_processor.has_tools:
+            for tool in tool_registry.get_tools():
+                name = tool.get("function", {}).get("name", "")
+                desc = tool.get("function", {}).get("description", "")
+                if name and desc:
+                    known_capabilities.append(f"Tool: {name} — {desc}")
+
+        # Plugins
+        for plugin in plugin_manager.plugins.values():
+            phrases = ", ".join(f'"{p}"' for p in plugin.activation_phrases[:3])
+            known_capabilities.append(
+                f'Voice command: say {phrases} to activate {plugin.name}'
+            )
+
+        # Built-in voice commands
+        known_capabilities.append(
+            'Voice command: "set sarcasm to N%" adjusts your humor level'
+        )
+
+        if known_capabilities:
+            all_mems = memory_store.load()
+            budget_mems = memory_store.get_budget(all_mems)
+            mem_strs = [m.content for m in budget_mems]
+            system_prompt = prompt_builder.build(
+                name=persona.name,
+                sarcasm_level=current_sarcasm_level[0],
+                memories=mem_strs,
+                time_context=get_time_context(),
+                capabilities=known_capabilities,
+            )
+            llm_processor.update_system_prompt(system_prompt)
+            logger.info(f"Injected {len(known_capabilities)} capabilities into system prompt")
+
     # Create transcription callback that routes through plugins first
     async def on_transcription_with_plugins(result) -> None:
         """Route transcription to plugins or LLM.
@@ -970,6 +1053,7 @@ async def create_pipeline(config: Config) -> Pipeline:
                     sarcasm_level=new_level,
                     memories=mem_strs,
                     time_context=get_time_context(),
+                    capabilities=known_capabilities,
                 )
                 llm_processor.update_system_prompt(new_prompt)
                 logger.info(f"Sarcasm level updated to {new_level}%")
@@ -1183,6 +1267,16 @@ async def create_pipeline(config: Config) -> Pipeline:
         await state_machine.reset()
         tts_processor.reset_state()  # Clears _cancelled, _inside_think, buffer, audio tracking
         _first_audio_sent[0] = False
+        # Pre-warm cloud endpoint and notify client of progress
+        if hasattr(generator, 'warm_up'):
+            async def _warm_up_with_status():
+                await data_handler.broadcast_warmup_status("started")
+                try:
+                    await generator.warm_up()
+                    await data_handler.broadcast_warmup_status("ready")
+                except Exception:
+                    await data_handler.broadcast_warmup_status("failed")
+            asyncio.create_task(_warm_up_with_status())
 
     # Create signaling app with all handlers
     app = create_signaling_app(

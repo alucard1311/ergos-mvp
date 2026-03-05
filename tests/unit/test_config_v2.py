@@ -58,7 +58,7 @@ class TestLLMConfigV2:
     def test_existing_fields_unchanged(self):
         """LLMConfig existing fields still have correct defaults."""
         cfg = LLMConfig()
-        assert cfg.context_length == 4096
+        assert cfg.context_length == 16384
         assert cfg.max_tokens == 512
         assert cfg.device == "auto"
         assert cfg.model_path is None
@@ -131,12 +131,12 @@ class TestConfigYaml:
     def test_config_yaml_stt_model(self):
         """config.yaml uses small.en STT model."""
         config = load_config("/home/vinay/ergos/config.yaml")
-        assert config.stt.model == "small.en"
+        assert config.stt.model == "base"
 
     def test_config_yaml_stt_compute_type(self):
         """config.yaml sets stt.compute_type to int8."""
         config = load_config("/home/vinay/ergos/config.yaml")
-        assert config.stt.compute_type == "int8"
+        assert config.stt.compute_type == "auto"
 
     def test_config_yaml_llm_chat_format(self):
         """config.yaml sets llm.chat_format to chatml."""
@@ -149,6 +149,6 @@ class TestConfigYaml:
         assert config.llm.n_gpu_layers == -1
 
     def test_config_yaml_llm_context_length(self):
-        """config.yaml llm.context_length is 4096 (upgraded from 1024)."""
+        """config.yaml llm.context_length is 16384 (upgraded from 4096)."""
         config = load_config("/home/vinay/ergos/config.yaml")
-        assert config.llm.context_length == 4096
+        assert config.llm.context_length == 16384

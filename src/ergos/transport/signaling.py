@@ -38,8 +38,7 @@ async def _process_incoming_audio(
                 # frame.to_ndarray() returns shape (channels, samples)
                 samples = frame.to_ndarray()
 
-                # DEBUG: Log raw frame info including layout/channels
-                logger.info(
+                logger.debug(
                     f"Raw frame: format={frame.format.name}, layout={frame.layout.name}, "
                     f"frame.samples={frame.samples}, sample_rate={frame.sample_rate}, "
                     f"ndarray shape={samples.shape}, dtype={samples.dtype}"
@@ -58,15 +57,13 @@ async def _process_incoming_audio(
 
                 if not is_planar and num_channels == 2:
                     # Interleaved stereo: LRLRLR... - take every other sample for mono
-                    logger.info(f"Interleaved stereo detected ({len(samples)} total), extracting mono")
                     # CRITICAL: Use .copy() to create contiguous array, not a strided view.
                     # Strided views (samples[::2]) are non-contiguous and cause segfaults
                     # when passed to native code (av/ffmpeg).
                     samples = samples[::2].copy()  # Take left channel samples
-                    logger.info(f"After stereo->mono: {len(samples)} samples")
                 elif is_planar and samples.ndim > 1:
                     # Planar: shape was (channels, samples), already flattened above
-                    logger.info(f"Planar audio, using channel 0: {len(samples)} samples")
+                    logger.debug(f"Planar audio, using channel 0: {len(samples)} samples")
 
                 # Handle both int16 and float audio formats from WebRTC
                 # Opus decoder typically outputs s16 (int16), but some configurations
@@ -146,6 +143,11 @@ async def offer(request: web.Request) -> web.Response:
     try:
         # Create session description from offer
         offer_desc = RTCSessionDescription(sdp=sdp, type=offer_type)
+
+        # Reset pipeline state for new connection (fixes stuck state after reconnect)
+        on_connect = request.app.get("on_connect")
+        if on_connect:
+            await on_connect()
 
         # Create peer connection
         pc = await manager.create_connection()

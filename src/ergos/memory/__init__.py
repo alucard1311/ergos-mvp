@@ -1,4 +1,4 @@
-"""Cross-session memory persistence for TARS personality.
+"""Cross-session memory persistence for Ergos personality.
 
 Provides MemoryStore for loading, saving, pruning, and budgeting memory entries,
 and MemoryEntry for representing individual remembered facts.

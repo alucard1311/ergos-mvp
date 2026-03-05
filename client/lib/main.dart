@@ -45,7 +45,7 @@ class ErgosHomePage extends StatefulWidget {
 class _ErgosHomePageState extends State<ErgosHomePage> {
   /// Server URL for signaling (configurable later).
   /// Use 10.0.2.2 for Android emulator, or your server's IP for real devices.
-  final String _serverUrl = 'http://10.0.0.190:8765';
+  final String _serverUrl = 'http://127.0.0.1:8765';
 
   /// WebRTC service for peer connection and data channel.
   late final WebRTCService _webRTCService;
@@ -67,6 +67,18 @@ class _ErgosHomePageState extends State<ErgosHomePage> {
 
   /// Current application mode (normal assistant or kitchen).
   AppMode _appMode = AppMode.normal;
+
+  /// Last transcription received from server.
+  String _lastTranscription = '';
+
+  /// Whether meeting recording is active.
+  bool _isRecording = false;
+
+  /// Whether LLM endpoint is warming up (cold start).
+  bool _isWarmingUp = false;
+
+  /// Active LLM model: "cloud", "local", or empty.
+  String _activeModel = '';
 
   /// Whether running on desktop (no VAD support).
   bool get _isDesktop =>
@@ -98,12 +110,36 @@ class _ErgosHomePageState extends State<ErgosHomePage> {
       });
     };
 
+    _webRTCService.onTranscription = (text) {
+      setState(() {
+        _lastTranscription = text;
+      });
+    };
+
+    _webRTCService.onRecordingStatus = (isRecording) {
+      setState(() {
+        _isRecording = isRecording;
+      });
+    };
+
+    _webRTCService.onWarmupStatus = (status) {
+      setState(() {
+        _isWarmingUp = status == 'started';
+      });
+    };
+
+    _webRTCService.onModelStatus = (model) {
+      setState(() {
+        _activeModel = model;
+      });
+    };
+
     _webRTCService.onDataChannelReady = (isReady) {
       setState(() {
         _dataChannelReady = isReady;
       });
-      if (isReady && !_isDesktop) {
-        // Start VAD listening when data channel is ready (mobile only)
+      if (isReady) {
+        // Start VAD listening when data channel is ready
         unawaited(_vadService.startListening());
       }
     };
@@ -118,12 +154,8 @@ class _ErgosHomePageState extends State<ErgosHomePage> {
   /// Connects to the server.
   Future<void> _connect() async {
     try {
-      // Initialize VAD service (skip on desktop - no permission_handler support)
-      if (!_isDesktop) {
-        await _vadService.initialize();
-      } else {
-        print('Desktop mode: VAD disabled (use mobile for voice input)');
-      }
+      // Initialize VAD service
+      await _vadService.initialize();
 
       // Connect WebRTC (this triggers the full connection flow)
       await _webRTCService.connect();
@@ -189,6 +221,9 @@ class _ErgosHomePageState extends State<ErgosHomePage> {
     setState(() {
       _dataChannelReady = false;
       _serverState = 'IDLE';
+      _isRecording = false;
+      _isWarmingUp = false;
+      _activeModel = '';
     });
   }
 
@@ -226,19 +261,6 @@ class _ErgosHomePageState extends State<ErgosHomePage> {
       body: SafeArea(
         child: Column(
           children: [
-            // Desktop warning banner
-            if (_isDesktop)
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.all(8),
-                color: Colors.orange.withAlpha(51),
-                child: const Text(
-                  'Desktop mode: Voice input requires mobile app',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(color: Colors.orange),
-                ),
-              ),
-
             // Mode selector
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 16.0),
@@ -291,22 +313,38 @@ class _ErgosHomePageState extends State<ErgosHomePage> {
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
+                    // Warm-up indicator
+                    if (_isWarmingUp)
+                      Padding(
+                        padding: const EdgeInsets.only(bottom: 16.0),
+                        child: _WarmupBadge(),
+                      ),
+                    // Recording indicator
+                    if (_isRecording)
+                      Padding(
+                        padding: const EdgeInsets.only(bottom: 16.0),
+                        child: _RecordingBadge(),
+                      ),
                     // Animated orb
                     ErgosOrb(
-                      serverState: _serverState,
+                      serverState: _isWarmingUp ? 'WARMING_UP' : _serverState,
                       onBargeIn: _sendBargeIn,
                       isKitchenMode: isKitchenMode,
                     ),
                     const SizedBox(height: 24),
                     // Tap hint or kitchen mode hint
                     Text(
-                      (_serverState == 'SPEAKING' || _serverState == 'SPEAKING_AND_LISTENING')
-                          ? 'Tap to interrupt'
-                          : isKitchenMode && _connectionState == ClientConnectionState.connected
-                              ? 'Say "next" to advance steps'
-                              : '',
+                      _isWarmingUp
+                          ? 'Loading cloud model...'
+                          : (_serverState == 'SPEAKING' || _serverState == 'SPEAKING_AND_LISTENING')
+                              ? 'Tap to interrupt'
+                              : isKitchenMode && _connectionState == ClientConnectionState.connected
+                                  ? 'Say "next" to advance steps'
+                                  : _isRecording
+                                      ? 'Say "save meeting notes" to stop'
+                                      : '',
                       style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                            color: Colors.white70,
+                            color: _isRecording ? Colors.red[300] : Colors.white70,
                           ),
                     ),
                   ],
@@ -332,6 +370,46 @@ class _ErgosHomePageState extends State<ErgosHomePage> {
                           color: Colors.white54,
                         ),
                   ),
+                  if (_activeModel.isNotEmpty) ...[
+                    const SizedBox(height: 4),
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Container(
+                          width: 6,
+                          height: 6,
+                          decoration: BoxDecoration(
+                            color: _activeModel == 'cloud'
+                                ? Colors.green[400]
+                                : Colors.orange[400],
+                            shape: BoxShape.circle,
+                          ),
+                        ),
+                        const SizedBox(width: 6),
+                        Text(
+                          _activeModel == 'cloud'
+                              ? 'Qwen3-32B (cloud)'
+                              : 'Qwen3-8B (local)',
+                          style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                color: _activeModel == 'cloud'
+                                    ? Colors.green[300]
+                                    : Colors.orange[300],
+                              ),
+                        ),
+                      ],
+                    ),
+                  ],
+                  if (_lastTranscription.isNotEmpty) ...[
+                    const SizedBox(height: 8),
+                    Text(
+                      '"$_lastTranscription"',
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                            color: Colors.white70,
+                            fontStyle: FontStyle.italic,
+                          ),
+                      textAlign: TextAlign.center,
+                    ),
+                  ],
                 ],
               ),
             ),
@@ -364,6 +442,137 @@ class _ErgosHomePageState extends State<ErgosHomePage> {
           ],
         ),
       ),
+    );
+  }
+}
+
+/// Animated warm-up badge with pulsing dot (shown during cloud LLM cold start).
+class _WarmupBadge extends StatefulWidget {
+  @override
+  State<_WarmupBadge> createState() => _WarmupBadgeState();
+}
+
+class _WarmupBadgeState extends State<_WarmupBadge>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _controller;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1200),
+    )..repeat(reverse: true);
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: _controller,
+      builder: (context, child) {
+        return Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+          decoration: BoxDecoration(
+            color: Colors.orange.withAlpha((140 + 80 * _controller.value).toInt()),
+            borderRadius: BorderRadius.circular(16),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              SizedBox(
+                width: 12,
+                height: 12,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2,
+                  valueColor: AlwaysStoppedAnimation<Color>(
+                    Colors.white.withAlpha((180 + 75 * _controller.value).toInt()),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              const Text(
+                'Warming up...',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 12,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+}
+
+/// Animated red recording badge with pulsing dot.
+class _RecordingBadge extends StatefulWidget {
+  @override
+  State<_RecordingBadge> createState() => _RecordingBadgeState();
+}
+
+class _RecordingBadgeState extends State<_RecordingBadge>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _controller;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1000),
+    )..repeat(reverse: true);
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: _controller,
+      builder: (context, child) {
+        return Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+          decoration: BoxDecoration(
+            color: Colors.red.withAlpha((180 + 75 * _controller.value).toInt()),
+            borderRadius: BorderRadius.circular(16),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 8,
+                height: 8,
+                decoration: BoxDecoration(
+                  color: Colors.white.withAlpha((180 + 75 * _controller.value).toInt()),
+                  shape: BoxShape.circle,
+                ),
+              ),
+              const SizedBox(width: 6),
+              const Text(
+                'REC',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 12,
+                  fontWeight: FontWeight.bold,
+                  letterSpacing: 1.2,
+                ),
+              ),
+            ],
+          ),
+        );
+      },
     );
   }
 }

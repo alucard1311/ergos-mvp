@@ -85,8 +85,11 @@ class TestOrpheusSynthesizer:
 
         assert result.audio_samples.dtype == np.float32
         np.testing.assert_allclose(result.audio_samples[0], 0.0, atol=1e-6)
-        assert result.audio_samples[1] == pytest.approx(16384 / 32768.0, rel=1e-4)
-        assert result.audio_samples[2] == pytest.approx(-16384 / 32768.0, rel=1e-4)
+        # Audio is normalized to 0.95 peak; peak of input is 32767/32768 ≈ 1.0
+        # so scale factor ≈ 0.95. Expected: (16384/32768) * 0.95 ≈ 0.475
+        scale = 0.95 / (32767.0 / 32768.0)
+        assert result.audio_samples[1] == pytest.approx(16384 / 32768.0 * scale, rel=1e-4)
+        assert result.audio_samples[2] == pytest.approx(-16384 / 32768.0 * scale, rel=1e-4)
 
     def test_synthesize_passes_config_options(self):
         """synthesize() passes voice_id, temperature, top_k from config."""
@@ -111,8 +114,9 @@ class TestOrpheusSynthesizer:
         """synthesize_stream() yields (audio_samples, sample_rate) tuples."""
         synth = self._make_synth()
 
-        chunk1 = np.zeros((1, 1000), dtype=np.int16)
-        chunk2 = np.zeros((1, 500), dtype=np.int16)
+        # Use speech-level amplitude (~0.25 peak = int16 value 8192)
+        chunk1 = (np.ones((1, 1000), dtype=np.float32) * 8192).astype(np.int16)
+        chunk2 = (np.ones((1, 500), dtype=np.float32) * 8192).astype(np.int16)
 
         async def fake_stream_tts(text, options=None):
             yield (24000, chunk1)
@@ -142,7 +146,8 @@ class TestOrpheusSynthesizer:
         synth = self._make_synth()
 
         async def fake_stream_tts(text, options=None):
-            yield (24000, np.zeros((1, 100), dtype=np.int16))
+            # Speech-level amplitude so it passes the noise ceiling filter
+            yield (24000, (np.ones((1, 100), dtype=np.float32) * 8192).astype(np.int16))
 
         mock_orpheus = MagicMock()
         mock_orpheus.stream_tts = fake_stream_tts
@@ -159,6 +164,87 @@ class TestOrpheusSynthesizer:
         chunks = asyncio.run(run())
         assert len(chunks) == 1
         assert chunks[0][1] == 24000
+
+    def test_synthesize_stream_skips_leading_noise_and_applies_fixed_gain(self):
+        """synthesize_stream() skips leading noise, passes trailing after speech starts.
+
+        Leading SNAC warmup frames (raw peak < _RAW_NOISE_CEIL) are skipped.
+        Once speech starts, all subsequent chunks pass through.
+        Fixed gain of 3.8x is applied with clipping.
+        """
+        synth = self._make_synth()
+
+        # A near-silent chunk at ~0.001 peak (SNAC warmup frame)
+        quiet_int16 = (np.ones(1000, dtype=np.float32) * 33).astype(np.int16)
+        quiet_int16_2d = quiet_int16.reshape(1, -1)
+
+        # A real speech chunk at ~0.25 peak
+        speech_int16 = (np.ones(1000, dtype=np.float32) * 8192).astype(np.int16)
+        speech_int16_2d = speech_int16.reshape(1, -1)
+
+        async def fake_stream_tts(text, options=None):
+            yield (24000, quiet_int16_2d)   # leading warmup — should be skipped
+            yield (24000, speech_int16_2d)   # real speech — should be kept
+            yield (24000, quiet_int16_2d)   # trailing quiet — passes through (after speech)
+
+        mock_orpheus = MagicMock()
+        mock_orpheus.stream_tts = fake_stream_tts
+
+        synth._ensure_model = MagicMock()
+        synth._orpheus = mock_orpheus
+
+        async def run():
+            chunks = []
+            async for audio, sr in synth.synthesize_stream("Hello"):
+                chunks.append((audio, sr))
+            return chunks
+
+        chunks = asyncio.run(run())
+        # Speech chunk + trailing quiet (passes through after speech started)
+        assert len(chunks) == 2
+
+        # Speech chunk should have fixed gain applied: 0.25 * 3.8 = 0.95
+        # Peak will be slightly lower due to fade-in envelope on first chunk
+        speech_peak = np.abs(chunks[0][0]).max()
+        assert speech_peak > 0.8, (
+            f"Speech chunk peak {speech_peak:.4f} is too low — fixed gain may be broken"
+        )
+        assert speech_peak <= 1.0, "Audio should be clipped to [-1, 1]"
+
+    def test_synthesize_stream_trims_prebuffer_leading_noise(self):
+        """synthesize_stream() trims leading noise from large pre-buffer chunks.
+
+        The first chunk from stream_tts is a ~1.5s pre-buffer that may contain
+        SNAC warmup noise at the start mixed with speech. The trimmer scans
+        in 85ms windows and cuts leading noise from within the chunk.
+        """
+        synth = self._make_synth()
+
+        # Build a large pre-buffer: 500 samples of noise + 5000 samples of speech
+        noise_part = (np.ones(500, dtype=np.float32) * 33).astype(np.int16)  # ~0.001 peak
+        speech_part = (np.ones(5000, dtype=np.float32) * 8192).astype(np.int16)  # ~0.25 peak
+        prebuffer = np.concatenate([noise_part, speech_part]).reshape(1, -1)
+
+        async def fake_stream_tts(text, options=None):
+            yield (24000, prebuffer)   # large pre-buffer with leading noise
+
+        mock_orpheus = MagicMock()
+        mock_orpheus.stream_tts = fake_stream_tts
+
+        synth._ensure_model = MagicMock()
+        synth._orpheus = mock_orpheus
+
+        async def run():
+            chunks = []
+            async for audio, sr in synth.synthesize_stream("Hello"):
+                chunks.append((audio, sr))
+            return chunks
+
+        chunks = asyncio.run(run())
+        assert len(chunks) == 1
+        # The output should be shorter than the full pre-buffer because
+        # leading noise was trimmed (though trim granularity is _NOISE_SCAN_WINDOW)
+        assert len(chunks[0][0]) <= 5500  # speech_part + at most one scan window
 
     def test_close_resets_model(self):
         """close() sets _orpheus to None."""
@@ -283,7 +369,7 @@ class TestConfigYamlOrpheus:
 
     def test_orpheus_optional_dep_in_pyproject(self):
         """orpheus-cpp is listed as an optional dependency under [orpheus] extra."""
-        with open("/home/vinay/ergos/pyproject.toml") as f:
+        with open("/home/vinay/ergos-mvp/pyproject.toml") as f:
             content = f.read()
         assert "orpheus" in content
         assert "orpheus-cpp" in content
@@ -329,7 +415,7 @@ class TestPipelineOrpheusWiring:
             mock_orpheus_cls.return_value = mock_orpheus_instance
 
             mock_plugin_instance = MagicMock()
-            mock_plugin_instance.plugins = []
+            mock_plugin_instance.plugins = {}
             mock_plugin_mgr.return_value = mock_plugin_instance
 
             mock_sm_instance = MagicMock()
@@ -371,7 +457,7 @@ class TestPipelineOrpheusWiring:
 
         with patch("ergos.tts.orpheus_synthesizer.OrpheusSynthesizer"):
             mock_plugin_instance = MagicMock()
-            mock_plugin_instance.plugins = []
+            mock_plugin_instance.plugins = {}
             mock_plugin_mgr.return_value = mock_plugin_instance
 
             mock_sm_instance = MagicMock()
@@ -413,7 +499,7 @@ class TestPipelineOrpheusWiring:
 
         with patch("ergos.tts.orpheus_synthesizer.OrpheusSynthesizer"):
             mock_plugin_instance = MagicMock()
-            mock_plugin_instance.plugins = []
+            mock_plugin_instance.plugins = {}
             mock_plugin_mgr.return_value = mock_plugin_instance
 
             mock_sm_instance = MagicMock()

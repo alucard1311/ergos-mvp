@@ -7,6 +7,7 @@ from typing import Optional
 
 from ergos.audio.types import AudioChunk
 from ergos.audio.vad import VADEvent, VADEventType
+from ergos.stt.filter import TranscriptionFilter
 from ergos.stt.transcriber import WhisperTranscriber
 from ergos.stt.types import TranscriptionCallback, TranscriptionResult
 
@@ -31,6 +32,7 @@ class STTProcessor:
     target_sample_rate: int = 16000
 
     # Internal state (not init params)
+    _filter: TranscriptionFilter = field(default_factory=TranscriptionFilter, init=False)
     _audio_buffer: bytearray = field(default_factory=bytearray, init=False)
     _source_sample_rate: int = field(default=16000, init=False)  # Track source rate
     _is_accumulating: bool = field(default=False, init=False)
@@ -43,6 +45,9 @@ class STTProcessor:
     _transcription_count: int = field(default=0, init=False)
     _last_partial_time: float = field(default=0.0, init=False)
     _partial_task: Optional[asyncio.Task] = field(default=None, init=False)
+    _no_result_callbacks: list[TranscriptionCallback] = field(
+        default_factory=list, init=False
+    )
 
     async def on_audio_chunk(self, chunk: AudioChunk) -> None:
         """Called by AudioPipeline for each audio chunk.
@@ -131,7 +136,7 @@ class STTProcessor:
             target_peak = 20000
             gain = min(target_peak / peak, 50.0)  # Cap gain at 50x for very quiet input
             audio_float = audio_float * gain
-            logger.info("STT: Applied gain %.1fx (peak was %.0f, new peak %.0f)", gain, peak, peak * gain)
+            logger.debug("STT: Applied gain %.1fx (peak was %.0f, new peak %.0f)", gain, peak, peak * gain)
 
         audio_array = np.clip(audio_float, -32768, 32767).astype(np.int16)
 
@@ -141,7 +146,7 @@ class STTProcessor:
             logger.debug("STT: Audio too short (%d samples), skipping", len(audio_array))
             return
 
-        logger.info("STT: Processing %d samples of audio", len(audio_array))
+        logger.debug("STT: Processing %d samples of audio", len(audio_array))
 
         # Convert back to bytes
         audio_bytes = audio_array.tobytes()
@@ -153,7 +158,7 @@ class STTProcessor:
             wf.setsampwidth(2)  # 16-bit
             wf.setframerate(self.target_sample_rate)
             wf.writeframes(audio_bytes)
-        logger.info("STT: Saved debug audio to %s", debug_path)
+        logger.debug("STT: Saved debug audio to %s", debug_path)
 
         # Run transcription in thread pool to not block event loop
         loop = asyncio.get_event_loop()
@@ -163,13 +168,24 @@ class STTProcessor:
             )
         except Exception as e:
             logger.error("STT transcription error: %s", e)
+            await self._fire_no_result_callbacks()
             return
 
-        logger.info("STT: Raw transcription result: %s", repr(result.text))
+        logger.debug("STT: Raw transcription result: %s", repr(result.text))
         if result.text.strip():
-            logger.info("STT: Transcribed: %s", result.text)
+            # Apply intelligent filter (hallucinations, confidence, repetitions)
+            filtered = self._filter.filter(result)
+            if filtered is None:
+                logger.debug("STT: Filtered out: %s", repr(result.text))
+                await self._fire_no_result_callbacks()
+                return
+            if filtered.text != result.text:
+                logger.info("STT: Cleaned: %r -> %r", result.text, filtered.text)
+            result = filtered
+
+            logger.info("STT: %s", result.text)
             self._transcription_count += 1
-            logger.info("STT: Calling %d transcription callbacks", len(self._transcription_callbacks))
+            logger.debug("STT: Calling %d transcription callbacks", len(self._transcription_callbacks))
             for callback in self._transcription_callbacks:
                 try:
                     await callback(result)
@@ -177,6 +193,7 @@ class STTProcessor:
                     logger.error("Transcription callback error: %s", e)
         else:
             logger.warning("STT: Empty transcription result, skipping callbacks")
+            await self._fire_no_result_callbacks()
 
     async def _start_partial_loop(self) -> None:
         """Periodically transcribe partial audio while speaking."""
@@ -224,6 +241,22 @@ class STTProcessor:
                             logger.error("Partial callback error: %s", e)
             except Exception as e:
                 logger.error("Partial transcription error: %s", e)
+
+    async def _fire_no_result_callbacks(self) -> None:
+        """Notify listeners that STT produced no actionable result."""
+        for callback in self._no_result_callbacks:
+            try:
+                await callback()
+            except Exception as e:
+                logger.error("No-result callback error: %s", e)
+
+    def add_no_result_callback(self, callback) -> None:
+        """Register a callback for when transcription produces no result.
+
+        Fires when transcription is filtered out (low confidence,
+        hallucination) or empty. Allows the pipeline to reset state.
+        """
+        self._no_result_callbacks.append(callback)
 
     def add_transcription_callback(self, callback: TranscriptionCallback) -> None:
         """Register a callback for final transcription results.

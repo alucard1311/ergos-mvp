@@ -79,7 +79,7 @@ class TestCreatePipelineVRAMRegistration:
             mock_data_handler.set_text_input_callback = MagicMock()
 
             mock_plugin_mgr = MagicMock()
-            mock_plugin_mgr.plugins = []
+            mock_plugin_mgr.plugins = {}
             mock_plugin_mgr.attach_all = MagicMock()
             mock_plugin_mgr.route_input = MagicMock(return_value=None)
             mock_plugin_mgr.discover_plugins = MagicMock()

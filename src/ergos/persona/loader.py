@@ -10,15 +10,15 @@ from .types import Persona
 logger = logging.getLogger(__name__)
 
 
-# Default persona: TARS — used when no persona_file is specified
+# Default persona: Ergos — used when no persona_file is specified
 DEFAULT_PERSONA = Persona(
-    name="TARS",
+    name="Ergos",
     description="a highly capable AI assistant with dry wit and deadpan humor",
     personality_traits=["precise", "reliable", "drily observational", "never mean", "understated"],
     voice="af_heart",
     speaking_style="deadpan and direct",
     sarcasm_level=75,
-    is_tars_persona=True,
+    is_ergos_persona=True,
 )
 
 
@@ -61,7 +61,7 @@ def load_persona(path: Path | str) -> Persona:
             voice=data.get("voice", DEFAULT_PERSONA.voice),
             speaking_style=data.get("speaking_style", DEFAULT_PERSONA.speaking_style),
             sarcasm_level=data.get("sarcasm_level", DEFAULT_PERSONA.sarcasm_level),
-            is_tars_persona=data.get("is_tars_persona", False),
+            is_ergos_persona=data.get("is_ergos_persona", False),
         )
 
         logger.info(f"Loaded persona '{persona.name}' from {path}")

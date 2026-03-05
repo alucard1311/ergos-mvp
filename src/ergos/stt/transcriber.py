@@ -42,6 +42,7 @@ class WhisperTranscriber:
         self._device = device
         self._compute_type = compute_type
         self._model: "WhisperModel | None" = None
+        self._initial_prompt: str | None = "Ergos, sarcasm"  # Bias Whisper to recognize wake word and commands
 
     def _ensure_model(self) -> "WhisperModel":
         """Lazy load the Whisper model on first use.
@@ -93,11 +94,14 @@ class WhisperTranscriber:
         model = self._ensure_model()
 
         # Transcribe with word timestamps for segment-level results
+        # initial_prompt conditions Whisper with conversation context,
+        # improving accuracy for follow-up questions and domain vocabulary.
         segments_iter, info = model.transcribe(
             audio_float,
             beam_size=5,
             language="en",
             word_timestamps=True,
+            initial_prompt=self._initial_prompt,
         )
 
         # Build segments list from iterator
@@ -188,10 +192,65 @@ class WhisperTranscriber:
                     confidence=0.0,
                 )
 
+    def transcribe_file(self, filepath: str) -> str:
+        """Transcribe an audio file to text.
+
+        Uses faster-whisper's built-in file handling (supports WAV, etc.).
+
+        Args:
+            filepath: Path to the audio file.
+
+        Returns:
+            Full transcription text.
+        """
+        model = self._ensure_model()
+        segments, _info = model.transcribe(
+            filepath, beam_size=5, language="en"
+        )
+        return " ".join(seg.text.strip() for seg in segments)
+
+    def transcribe_file_segments(
+        self, filepath: str
+    ) -> list[tuple[float, float, str]]:
+        """Transcribe an audio file and return timestamped segments.
+
+        Args:
+            filepath: Path to the audio file.
+
+        Returns:
+            List of (start_seconds, end_seconds, text) tuples.
+        """
+        model = self._ensure_model()
+        segments, _info = model.transcribe(
+            filepath, beam_size=5, language="en"
+        )
+        return [
+            (seg.start, seg.end, seg.text.strip())
+            for seg in segments
+            if seg.text.strip()
+        ]
+
     @property
     def model_loaded(self) -> bool:
         """Check if the model has been loaded."""
         return self._model is not None
+
+    def set_prompt_context(self, recent_text: str) -> None:
+        """Set conversation context for Whisper prompt conditioning.
+
+        Whisper's initial_prompt biases the decoder toward vocabulary and
+        phrasing it has recently seen, improving accuracy for follow-up
+        questions and domain-specific terms.
+
+        Args:
+            recent_text: Recent conversation text (last ~200 chars is optimal).
+        """
+        # Whisper works best with a concise prompt; trim to last ~200 chars
+        if len(recent_text) > 200:
+            recent_text = recent_text[-200:]
+        # Prepend wake word so Whisper always knows it
+        prefix = "Ergos. "
+        self._initial_prompt = prefix + recent_text if recent_text.strip() else prefix.strip()
 
     def close(self) -> None:
         """Release model resources."""

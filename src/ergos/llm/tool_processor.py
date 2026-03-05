@@ -31,13 +31,15 @@ logger = logging.getLogger(__name__)
 # Regex to extract <tool_call>...</tool_call> blocks from Qwen3 responses
 _TOOL_CALL_RE = re.compile(r"<tool_call>\s*(\{.*?\})\s*</tool_call>", re.DOTALL)
 
-# Map of tool name -> narration string spoken while tool executes
+# Map of tool name -> narration string spoken while tool executes.
+# Each string MUST have >= 20 alphanumeric chars to avoid garbled Orpheus output
+# (short fragments produce noise — see TTS _MIN_SPEAKABLE_CHARS).
 _TOOL_NARRATIONS: dict[str, str] = {
-    "file_read": "Let me read that file.",
-    "shell_run": "Let me run that command.",
-    "file_list": "Let me check what files are there.",
+    "file_read": "Let me take a look at that file for you.",
+    "shell_run": "Let me run that command for you real quick.",
+    "file_list": "Let me check what files are in there for you.",
 }
-_DEFAULT_NARRATION = "Let me check that..."
+_DEFAULT_NARRATION = "Let me take a look at that for you."
 
 
 class ToolCallProcessor:
@@ -220,8 +222,8 @@ class ToolCallProcessor:
                     self._executor.execute(tool_name, args),
                 )
 
-                # Speak completion AFTER both narration and execution finish
-                await speak("Done.")
+                # No completion narration — "Done." is too short for Orpheus
+                # (produces garbled audio and triggers false barge-in from echo)
 
                 logger.info(
                     "Tool '%s' result (step %d): %s",

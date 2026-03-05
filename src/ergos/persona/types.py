@@ -12,13 +12,13 @@ class Persona:
     that shapes response behavior.
 
     Attributes:
-        name: Display name of the assistant (e.g., "TARS", "Aria").
+        name: Display name of the assistant (e.g., "Ergos", "Aria").
         description: Short bio/description of the assistant.
         personality_traits: List of traits like ["friendly", "concise", "helpful"].
         voice: TTS voice selection (Kokoro voice name).
         speaking_style: Optional style notes like "casual" or "professional".
-        sarcasm_level: Humor intensity 0-100; 75 is TARS default.
-        is_tars_persona: True when this persona uses the TARS prompt builder.
+        sarcasm_level: Humor intensity 0-100; 75 is Ergos default.
+        is_ergos_persona: True when this persona uses the Ergos prompt builder.
     """
 
     name: str
@@ -27,7 +27,7 @@ class Persona:
     voice: str = "af_sarah"
     speaking_style: str = ""
     sarcasm_level: int = 75
-    is_tars_persona: bool = False
+    is_ergos_persona: bool = False
 
     @property
     def system_prompt(self) -> str:
