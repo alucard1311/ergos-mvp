@@ -212,6 +212,36 @@ class LLMGenerator:
         """
         return self._n_ctx
 
+    def create_chat_completion_sync(
+        self,
+        messages: list[dict],
+        tools: list[dict] | None = None,
+        max_tokens: int = 512,
+    ) -> dict:
+        """Call create_chat_completion with model_lock held. Blocking — run from executor.
+
+        Acquires the model lock to prevent concurrent model access (llama_cpp is NOT
+        thread-safe — concurrent sampling causes segfaults).
+
+        Args:
+            messages: List of message dicts in chat format.
+            tools: Optional list of ChatCompletionTool dicts for tool-calling.
+            max_tokens: Maximum tokens to generate (default 512).
+
+        Returns:
+            Raw create_chat_completion response dict with choices[0].message.
+        """
+        model = self._ensure_model()
+        with self._model_lock:
+            return model.create_chat_completion(
+                messages=messages,
+                tools=tools or [],
+                tool_choice="auto" if tools else "none",
+                max_tokens=max_tokens,
+                temperature=0.2,
+                stop=["<|im_end|>", "<|endoftext|>"],
+            )
+
     def cancel(self) -> None:
         """Cancel any ongoing generation (for barge-in support)."""
         if self._generating:
