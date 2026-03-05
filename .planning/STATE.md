@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v2.0
 milestone_name: TARS
-status: completed
-stopped_at: Completed 16-03-PLAN.md (TARS personality pipeline wiring)
-last_updated: "2026-03-04T23:57:03.754Z"
-last_activity: 2026-03-04 — Phase 16 Plan 03 complete (TARS personality pipeline wiring)
+status: in-progress
+stopped_at: Completed 17-01-PLAN.md (tool registry and executor)
+last_updated: "2026-03-05T06:23:49.791Z"
+last_activity: 2026-03-05 — Phase 17 Plan 01 complete (tool registry and executor)
 progress:
   total_phases: 21
   completed_phases: 16
-  total_plans: 36
-  completed_plans: 36
-  percent: 100
+  total_plans: 39
+  completed_plans: 37
+  percent: 95
 ---
 
 # Project State
@@ -25,12 +25,12 @@ See: .planning/PROJECT.md (updated 2026-03-03)
 
 ## Current Position
 
-Phase: 16 of 19 (TARS Personality) — COMPLETE
-Plan: 3 of 3 in current phase — COMPLETE (16-03 TARS personality pipeline wiring)
-Status: Phase 16 complete; Phase 17 (Agentic Execution) is next
-Last activity: 2026-03-04 — Phase 16 Plan 03 complete (TARS personality pipeline wiring)
+Phase: 17 of 19 (Agentic Execution) — IN PROGRESS
+Plan: 1 of 3 in current phase — COMPLETE (17-01 tool registry and executor)
+Status: Phase 17 in progress; Plan 02 (ToolCallProcessor) is next
+Last activity: 2026-03-05 — Phase 17 Plan 01 complete (tool registry and executor)
 
-Progress: [██████████] 100% (36/36 plans complete)
+Progress: [█████████-] 95% (37/39 plans complete)
 
 ## v1 Performance Metrics (archived)
 
@@ -78,6 +78,9 @@ v2-relevant decisions:
 - [Phase 16-tars-personality]: Memory extraction uses generator.generate() directly (not llm_processor) to avoid polluting conversation history
 - [Phase 16-tars-personality]: ConnectionManager.set_disconnect_callback() added as clean hook for peer disconnect lifecycle events
 - [Phase 16-tars-personality]: Sarcasm command intercept is first gate in on_transcription_with_plugins() — returns early so command never reaches plugins or LLM
+- [Phase 17-agentic-execution]: allowed_prefixes=None allows all commands for backwards-compatible user-defined tools; list (even empty) enforces allowlist
+- [Phase 17-agentic-execution]: _config stores extra YAML fields generically -- any tool can carry extra config without registry code changes
+- [Phase 17-agentic-execution]: file_read/shell_run/file_list all return error strings (never raise) -- callers never need try/except
 
 ### Pending Todos
 
@@ -95,6 +98,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-04T23:52:36.454Z
-Stopped at: Completed 16-03-PLAN.md (TARS personality pipeline wiring)
+Last session: 2026-03-05T06:23:49.789Z
+Stopped at: Completed 17-01-PLAN.md (tool registry and executor)
 Resume file: None
