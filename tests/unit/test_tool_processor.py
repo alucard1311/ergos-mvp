@@ -454,3 +454,110 @@ class TestNarrationMessages:
         # Unknown tool
         narration = processor._narration_before("unknown_tool")
         assert isinstance(narration, str) and len(narration) > 0
+
+
+class TestHistoryUsedInMessages:
+    @pytest.mark.asyncio
+    async def test_existing_history_included_in_messages_to_llm(
+        self, processor, mock_generator, mock_llm_processor
+    ):
+        """Existing conversation history from llm_processor is included in messages list."""
+        from ergos.llm.processor import Message
+
+        # Pre-populate history
+        mock_llm_processor._history.append(Message(role="user", content="Hello"))
+        mock_llm_processor._history.append(Message(role="assistant", content="Hi there!"))
+
+        captured_messages: list[list[dict]] = []
+
+        def capture_call(messages, tools=None, max_tokens=512):
+            captured_messages.append(list(messages))
+            return _make_text_response("reply")
+
+        mock_generator.create_chat_completion_sync.side_effect = capture_call
+
+        speak = AsyncMock()
+        await processor.process("How are you?", speak, mock_llm_processor)
+
+        assert len(captured_messages) >= 1
+        messages = captured_messages[0]
+
+        # System message first
+        assert messages[0]["role"] == "system"
+
+        # History messages should be present
+        roles = [m["role"] for m in messages]
+        assert "user" in roles
+        assert "assistant" in roles
+
+        # Find the history user message (not the current request)
+        history_user_msgs = [m for m in messages if m["role"] == "user" and "Hello" in m["content"]]
+        assert len(history_user_msgs) == 1
+
+    @pytest.mark.asyncio
+    async def test_system_prompt_is_first_message(
+        self, processor, mock_generator, mock_llm_processor
+    ):
+        """First message in messages list must always be the system message."""
+        captured_messages: list[list[dict]] = []
+
+        def capture_call(messages, tools=None, max_tokens=512):
+            captured_messages.append(list(messages))
+            return _make_text_response("reply")
+
+        mock_generator.create_chat_completion_sync.side_effect = capture_call
+
+        speak = AsyncMock()
+        await processor.process("test request", speak, mock_llm_processor)
+
+        assert len(captured_messages) >= 1
+        first_msg = captured_messages[0][0]
+        assert first_msg["role"] == "system"
+        assert "You are a test assistant." in first_msg["content"]
+
+
+class TestToolExecutionErrorHandling:
+    @pytest.mark.asyncio
+    async def test_tool_error_string_passed_as_tool_result(
+        self, mock_generator, mock_registry, mock_executor, mock_llm_processor
+    ):
+        """If executor returns an error string, it should be passed as tool result (not raised)."""
+        from ergos.llm.tool_processor import ToolCallProcessor
+
+        # ToolExecutor returns error string (never raises, per Plan 01 design)
+        mock_executor.execute = AsyncMock(return_value="Error: file not found: /nonexistent.txt")
+
+        # Capture messages from the second call
+        captured: list[list[dict]] = []
+        call_count = 0
+
+        def capture_calls(messages, tools=None, max_tokens=512):
+            nonlocal call_count
+            call_count += 1
+            captured.append(list(messages))
+            if call_count == 1:
+                return _make_tool_call_response(
+                    "file_read", json.dumps({"path": "/nonexistent.txt"})
+                )
+            return _make_text_response("Sorry, I couldn't read that file")
+
+        mock_generator.create_chat_completion_sync.side_effect = capture_calls
+
+        processor = ToolCallProcessor(
+            generator=mock_generator,
+            registry=mock_registry,
+            executor=mock_executor,
+            system_prompt="test",
+        )
+
+        speak = AsyncMock()
+        # Should not raise even with error result
+        result = await processor.process("Read /nonexistent.txt", speak, mock_llm_processor)
+
+        assert result == "Sorry, I couldn't read that file"
+        # The second call's messages should contain the tool error result
+        assert len(captured) == 2
+        second_call_msgs = captured[1]
+        tool_messages = [m for m in second_call_msgs if m.get("role") == "tool"]
+        assert len(tool_messages) == 1
+        assert "Error" in tool_messages[0]["content"]
