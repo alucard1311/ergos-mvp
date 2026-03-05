@@ -26,7 +26,7 @@ class LLMConfig(BaseModel):
     """Language model configuration."""
 
     model_path: Optional[str] = None
-    context_length: int = 4096
+    context_length: int = 16384
     max_tokens: int = 512
     device: str = "auto"
     chat_format: str = "chatml"  # Chat template format: chatml (Qwen3), llama-3, etc.
@@ -70,9 +70,18 @@ class PersonaConfig(BaseModel):
 
     persona_file: Optional[str] = None  # Path to persona YAML file
     # Fallback values if no file specified
-    name: str = "TARS"
+    name: str = "Ergos"
     system_prompt: str = "You are a helpful voice assistant."
     sarcasm_level: int = Field(default=75, ge=0, le=100)  # Humor intensity 0-100
+    wake_word: str = "ergos"  # Only respond when this word is in the transcription ("" to disable)
+
+
+class ToolsConfig(BaseModel):
+    """Tool execution configuration."""
+
+    enabled: bool = True  # Enable agentic tool calling
+    tools_dir: str = "~/.ergos/tools"  # Directory for YAML tool registry files
+    max_steps: int = 8  # Max agentic loop iterations
 
 
 class Config(BaseModel):
@@ -83,6 +92,7 @@ class Config(BaseModel):
     llm: LLMConfig = Field(default_factory=LLMConfig)
     tts: TTSConfig = Field(default_factory=TTSConfig)
     persona: PersonaConfig = Field(default_factory=PersonaConfig)
+    tools: ToolsConfig = Field(default_factory=ToolsConfig)
 
 
 def load_config(path: Path | str = "config.yaml") -> Config:

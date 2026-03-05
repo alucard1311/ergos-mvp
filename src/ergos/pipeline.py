@@ -19,7 +19,7 @@ from ergos.llm.generator import LLMGenerator
 from ergos.llm.processor import LLMProcessor
 from ergos.plugins import PluginManager
 from ergos.persona.loader import DEFAULT_PERSONA, load_persona
-from ergos.persona.builder import TARSPromptBuilder, get_time_context, try_sarcasm_command
+from ergos.persona.builder import ErgosPromptBuilder, get_time_context, try_sarcasm_command
 from ergos.memory import MemoryStore, MemoryEntry
 from ergos.memory.store import EXTRACTION_PROMPT, parse_extraction_result, format_history_for_extraction
 from ergos.state import ConversationStateMachine, ConversationState
@@ -30,9 +30,107 @@ from ergos.transport.connection import ConnectionManager
 from ergos.transport.data_channel import DataChannelHandler
 from ergos.transport.signaling import create_signaling_app
 from ergos.tts.processor import TTSProcessor
-from ergos.tts.synthesizer import KokoroSynthesizer
+from ergos.tts.synthesizer import TTSSynthesizer
 
 logger = logging.getLogger(__name__)
+
+# Default tool registry YAML content — shipped built-in and written to ~/.ergos/tools/
+# on first server start when tools are enabled. Mirrors tools/default.yaml.
+_DEFAULT_TOOLS_YAML = """\
+# Default tool registry for Ergos agentic execution
+#
+# Add new tools by creating additional .yaml files in the same directory.
+# Tools are hot-reloadable via ToolRegistry.reload() without server restart.
+#
+# Shell command security: shell_run enforces allowed_prefixes.
+# Commands not starting with a listed prefix are rejected with an error message.
+# Remove allowed_prefixes entirely to allow any command (use with caution).
+
+tools:
+  - name: file_read
+    description: "Read the contents of a file at the given path"
+    impl: builtin.file_read
+    parameters:
+      type: object
+      properties:
+        path:
+          type: string
+          description: "Absolute or home-relative file path (e.g., ~/notes.txt)"
+      required: [path]
+
+  - name: shell_run
+    description: "Run a shell command and return stdout+stderr. Timeout is 10 seconds."
+    impl: builtin.shell_run
+    allowed_prefixes:
+      - "ls"
+      - "cat"
+      - "head"
+      - "tail"
+      - "wc"
+      - "find"
+      - "grep"
+      - "echo"
+      - "pwd"
+      - "whoami"
+      - "date"
+      - "df"
+      - "du"
+      - "uname"
+      - "python3"
+      - "uv run"
+    parameters:
+      type: object
+      properties:
+        command:
+          type: string
+          description: "Shell command to execute (must start with an allowed prefix)"
+        timeout_seconds:
+          type: integer
+          description: "Max seconds to wait (default 10, max 30)"
+      required: [command]
+
+  - name: file_list
+    description: "List files in a directory matching an optional glob pattern"
+    impl: builtin.file_list
+    parameters:
+      type: object
+      properties:
+        directory:
+          type: string
+          description: "Directory to list (supports ~ expansion)"
+        pattern:
+          type: string
+          description: "Optional glob pattern, e.g. '*.py'. Default is '*' (all files)."
+      required: [directory]
+"""
+
+
+def _ensure_default_tools(tools_dir: str) -> None:
+    """Create default tool registry YAML if tools directory has no YAML files.
+
+    Called at pipeline startup when tools are enabled. Creates ~/.ergos/tools/
+    and writes default.yaml if the directory is missing or has no YAML files.
+    This allows the server to work out of the box without manual file setup.
+
+    Args:
+        tools_dir: Path to tools directory (supports ~ expansion).
+    """
+    import os
+    expanded = os.path.expanduser(tools_dir)
+    os.makedirs(expanded, exist_ok=True)
+
+    # Check if any YAML files exist
+    import glob as _glob
+    existing_yamls = _glob.glob(os.path.join(expanded, "*.yaml")) + _glob.glob(
+        os.path.join(expanded, "*.yml")
+    )
+    if not existing_yamls:
+        default_path = os.path.join(expanded, "default.yaml")
+        with open(default_path, "w") as f:
+            f.write(_DEFAULT_TOOLS_YAML)
+        logger.info(f"Created default tool registry at {default_path}")
+    else:
+        logger.debug(f"Tool registry directory already has YAML files: {existing_yamls}")
 
 
 @dataclass
@@ -80,38 +178,24 @@ class Pipeline:
 
         logger.info("Pre-loading AI models...")
 
-        # Load models in thread pool to not block event loop
+        # Load models sequentially in thread pool to avoid llama.cpp
+        # thread-safety issues (both LLM and Orpheus TTS use llama.cpp)
         loop = asyncio.get_event_loop()
-        with concurrent.futures.ThreadPoolExecutor(max_workers=3) as executor:
-            # Submit all model loading tasks
-            futures = []
 
-            # STT model (Whisper)
-            futures.append(
-                loop.run_in_executor(
-                    executor,
-                    self.stt_processor.transcriber._ensure_model
-                )
-            )
+        # STT model (Whisper) — independent, can load first
+        await loop.run_in_executor(
+            None, self.stt_processor.transcriber._ensure_model
+        )
 
-            # LLM model (llama.cpp)
-            futures.append(
-                loop.run_in_executor(
-                    executor,
-                    self.llm_processor.generator._ensure_model
-                )
-            )
+        # LLM model (llama.cpp) — must finish before Orpheus starts
+        await loop.run_in_executor(
+            None, self.llm_processor.generator._ensure_model
+        )
 
-            # TTS model (Kokoro)
-            futures.append(
-                loop.run_in_executor(
-                    executor,
-                    self.tts_processor.synthesizer._ensure_model
-                )
-            )
-
-            # Wait for all to complete
-            await asyncio.gather(*futures)
+        # TTS model (Orpheus/Kokoro) — also uses llama.cpp, load after LLM
+        await loop.run_in_executor(
+            None, self.tts_processor.synthesizer._ensure_model
+        )
 
         logger.info("All AI models pre-loaded successfully")
 
@@ -200,13 +284,13 @@ async def create_pipeline(config: Config) -> Pipeline:
     if config.persona.persona_file:
         system_prompt = persona.system_prompt
 
-    # If TARS persona (default or from file), use TARSPromptBuilder
+    # If Ergos persona (default or from file), use ErgosPromptBuilder
     prompt_builder = None
     memory_store = MemoryStore()
     current_sarcasm_level = [config.persona.sarcasm_level]  # Mutable for voice command updates
 
-    if persona.is_tars_persona:
-        prompt_builder = TARSPromptBuilder()
+    if persona.is_ergos_persona:
+        prompt_builder = ErgosPromptBuilder()
         # Load memories for prompt injection
         all_memories = memory_store.load()
         budget_memories = memory_store.get_budget(all_memories)
@@ -220,7 +304,7 @@ async def create_pipeline(config: Config) -> Pipeline:
             time_context=time_context,
         )
         logger.info(
-            f"TARS persona active: sarcasm={current_sarcasm_level[0]}%, "
+            f"Ergos persona active: sarcasm={current_sarcasm_level[0]}%, "
             f"{len(budget_memories)} memories loaded"
         )
     # else: system_prompt already set from persona.system_prompt or inline config (existing behavior unchanged)
@@ -237,6 +321,7 @@ async def create_pipeline(config: Config) -> Pipeline:
         llm_processor = LLMProcessor(
             generator=generator,
             system_prompt=system_prompt,
+            max_tokens=config.llm.max_tokens,
             chat_format=config.llm.chat_format,
         )
         logger.debug("Created LLM processor")
@@ -253,8 +338,39 @@ async def create_pipeline(config: Config) -> Pipeline:
         llm_processor = LLMProcessor(
             generator=generator,
             system_prompt=system_prompt,
+            max_tokens=config.llm.max_tokens,
             chat_format=config.llm.chat_format,
         )
+
+    # 4b. Instantiate tool execution infrastructure (if enabled)
+    tool_processor = None
+    if config.tools.enabled and config.llm.model_path:
+        from ergos.tools import ToolRegistry, ToolExecutor
+        from ergos.llm.tool_processor import ToolCallProcessor
+
+        # Ensure default tools exist on first run
+        _ensure_default_tools(config.tools.tools_dir)
+
+        tool_registry = ToolRegistry(tools_dir=config.tools.tools_dir)
+        tool_registry.load()
+
+        if tool_registry.has_tools:
+            tool_executor = ToolExecutor(impl_map=tool_registry.get_impl_map(), registry=tool_registry)
+            tool_processor = ToolCallProcessor(
+                generator=generator,
+                registry=tool_registry,
+                executor=tool_executor,
+                system_prompt=system_prompt,
+                max_steps=config.tools.max_steps,
+            )
+            logger.info(f"Tool processor enabled: {len(tool_registry.get_tools())} tools loaded")
+        else:
+            logger.info("Tools enabled but no tools found in registry")
+    else:
+        if not config.tools.enabled:
+            logger.info("Tool processor disabled (tools.enabled=false in config)")
+        elif not config.llm.model_path:
+            logger.info("Tool processor disabled (no LLM model path configured)")
 
     # 5. Instantiate TTS components
     import os
@@ -281,7 +397,7 @@ async def create_pipeline(config: Config) -> Pipeline:
     else:
         # Default: Kokoro
         tts_model_dir = os.path.expanduser("~/.ergos/models/tts")
-        tts_synthesizer = KokoroSynthesizer(
+        tts_synthesizer = TTSSynthesizer(
             model_path=os.path.join(tts_model_dir, "kokoro-v1.0.onnx"),
             voices_path=os.path.join(tts_model_dir, "voices-v1.0.bin"),
         )
@@ -328,6 +444,8 @@ async def create_pipeline(config: Config) -> Pipeline:
     # ========== Idle timeout infrastructure ==========
     # Timeout to IDLE after 30s of silence post-response (locked decision from CONTEXT.md)
     _idle_timeout_task: list[Optional[asyncio.Task]] = [None]
+    # Safety timeout: if stuck in PROCESSING for 60s (e.g. plugin exception), force IDLE
+    _processing_timeout_task: list[Optional[asyncio.Task]] = [None]
 
     async def _start_idle_timeout() -> None:
         """Start 30s idle timeout. Cancelled when user starts speaking."""
@@ -354,28 +472,89 @@ async def create_pipeline(config: Config) -> Pipeline:
             _idle_timeout_task[0] = None
             logger.debug("Idle timeout: cancelled by speech")
 
+    async def _start_processing_timeout() -> None:
+        """Start safety timeout when entering PROCESSING.
+
+        If plugin_speak_callback or LLM handling throws an exception before
+        calling state_machine.stop(), state stays PROCESSING with no recovery.
+        This timeout forces IDLE as a last-resort safety net.
+        The primary fix is try/finally in plugin_speak_callback; this is defence-in-depth.
+
+        Timeout is extended to 300s when tool_processor is active to allow multi-step
+        agentic execution (each tool call + narration can take several seconds).
+        """
+        if _processing_timeout_task[0] is not None and not _processing_timeout_task[0].done():
+            _processing_timeout_task[0].cancel()
+
+        _PROCESSING_TIMEOUT_S = (
+            300.0 if (tool_processor is not None and tool_processor.has_tools) else 60.0
+        )
+
+        async def _processing_timeout():
+            await asyncio.sleep(_PROCESSING_TIMEOUT_S)
+            current = state_machine.state
+            if current == ConversationState.PROCESSING:
+                logger.warning(
+                    f"Processing timeout: stuck in PROCESSING for {_PROCESSING_TIMEOUT_S:.0f}s "
+                    "— forcing IDLE (plugin_speak_callback or LLM handler likely threw an unhandled exception)"
+                )
+                await state_machine.transition_to(ConversationState.IDLE)
+
+        _processing_timeout_task[0] = asyncio.create_task(_processing_timeout())
+        logger.debug(f"Processing timeout: {_PROCESSING_TIMEOUT_S:.0f}s safety timer started")
+
+    async def _cancel_processing_timeout() -> None:
+        """Cancel processing timeout when state leaves PROCESSING."""
+        if _processing_timeout_task[0] is not None and not _processing_timeout_task[0].done():
+            _processing_timeout_task[0].cancel()
+            _processing_timeout_task[0] = None
+            logger.debug("Processing timeout: cancelled")
+
     # Wire idle timeout to state changes: start 30s timer on IDLE entry, cancel on activity
     async def _on_state_change_for_idle_timeout(event) -> None:
-        """Start idle timeout when entering IDLE; cancel on any activity."""
+        """Manage idle and processing timeouts on state changes."""
         if event.new_state == ConversationState.IDLE:
+            await _cancel_processing_timeout()
             await _start_idle_timeout()
-        elif event.new_state in (ConversationState.LISTENING, ConversationState.PROCESSING):
+        elif event.new_state == ConversationState.PROCESSING:
             await _cancel_idle_timeout()
+            await _start_processing_timeout()
+        elif event.new_state == ConversationState.LISTENING:
+            await _cancel_idle_timeout()
+            await _cancel_processing_timeout()
+        elif event.new_state in (ConversationState.SPEAKING, ConversationState.SPEAKING_AND_LISTENING):
+            # SPEAKING/SPEAKING_AND_LISTENING: cancel processing timeout (we're no longer stuck)
+            await _cancel_processing_timeout()
 
     state_machine.add_callback(_on_state_change_for_idle_timeout)
-    logger.debug("Wired: state machine -> idle timeout manager (30s on IDLE entry)")
+    logger.debug("Wired: state machine -> idle timeout manager (30s on IDLE entry, 60s on PROCESSING entry)")
 
     # Register state machine transitions for VAD events FIRST
     # (must happen before STT processing to ensure correct state)
     _overlap_timer_task: list[Optional[asyncio.Task]] = [None]  # Track overlap timer for cancellation
+    # Echo suppression: track when SPEAKING_AND_LISTENING was entered so we can
+    # distinguish brief echo activations from real user barge-in.
+    _overlap_entry_time: list[Optional[float]] = [None]
+
+    # Minimum sustained speech duration (in seconds) to count as real barge-in.
+    # Echo from TTS typically lasts < 500ms in VAD; real speech sustains longer.
+    # This threshold must be shorter than the overlap window so short real speech
+    # (e.g. "stop") still triggers barge-in on SPEECH_END.
+    _MIN_BARGE_IN_DURATION_S = 0.8
+
+    # Overlap window duration. Increased from 0.5s to 1.5s so that:
+    #   - Brief echo (< 0.8s sustained) → SPEECH_END before timer → restored to SPEAKING
+    #   - Long user speech (> 1.5s sustained without pause) → timer fires → barge-in
+    _OVERLAP_WINDOW_S = 1.5
 
     async def on_vad_for_state(event: VADEvent) -> None:
         """Trigger state machine transitions on VAD events.
 
         Handles full-duplex: when SPEECH_START fires during SPEAKING,
-        transitions to SPEAKING_AND_LISTENING with a 500ms overlap window.
-        When SPEECH_END fires during SPEAKING_AND_LISTENING, executes
-        barge-in immediately and transitions to PROCESSING.
+        transitions to SPEAKING_AND_LISTENING with a 1.5s overlap window.
+        When SPEECH_END fires during SPEAKING_AND_LISTENING:
+          - If speech was brief (< 0.8s) → likely TTS echo, restore to SPEAKING
+          - If speech was sustained (>= 0.8s) → real barge-in, execute immediately
         """
         current_state = state_machine.state
 
@@ -387,24 +566,10 @@ async def create_pipeline(config: Config) -> Pipeline:
                 await state_machine.start_listening()
 
             elif current_state == ConversationState.SPEAKING:
-                # Transition to full-duplex overlap state
-                # AI audio continues for ~500ms overlap window
-                success = await state_machine.transition_to(
-                    ConversationState.SPEAKING_AND_LISTENING,
-                    metadata={"trigger": "speech_start_during_speaking"}
-                )
-                if success:
-                    # Schedule barge-in after 500ms overlap window
-                    # If SPEECH_END fires before timer, timer is cancelled
-                    async def _overlap_timeout():
-                        await asyncio.sleep(0.5)
-                        if state_machine.state == ConversationState.SPEAKING_AND_LISTENING:
-                            logger.info("Overlap timeout: executing barge-in after 500ms")
-                            await state_machine.barge_in()
-                            await state_machine.start_processing()
-
-                    _overlap_timer_task[0] = asyncio.create_task(_overlap_timeout())
-                    logger.debug("SPEAKING_AND_LISTENING: 500ms overlap timer started")
+                # Ignore VAD during SPEAKING — no AEC means TTS echo from
+                # laptop speakers is indistinguishable from real speech.
+                # Barge-in is disabled until acoustic echo cancellation is added.
+                logger.debug("Ignoring SPEECH_START during SPEAKING (no AEC, echo likely)")
 
             elif current_state == ConversationState.SPEAKING_AND_LISTENING:
                 # Already in overlap state, ignore additional SPEECH_START
@@ -414,17 +579,41 @@ async def create_pipeline(config: Config) -> Pipeline:
                 logger.debug(f"Ignoring SPEECH_START in state {current_state.value}")
 
         elif event.type == VADEventType.SPEECH_END:
-            # Cancel overlap timer if pending (SPEECH_END fires before 500ms)
+            # Cancel overlap timer if pending (SPEECH_END fires before timeout)
             if _overlap_timer_task[0] is not None and not _overlap_timer_task[0].done():
                 _overlap_timer_task[0].cancel()
                 _overlap_timer_task[0] = None
                 logger.debug("SPEAKING_AND_LISTENING: overlap timer cancelled by SPEECH_END")
 
             if current_state == ConversationState.SPEAKING_AND_LISTENING:
-                # User finished speaking during overlap — execute barge-in now
-                await state_machine.barge_in()  # Cancels LLM+TTS, transitions to LISTENING
-                await state_machine.start_processing()
-                logger.info("Barge-in complete: SPEAKING_AND_LISTENING -> PROCESSING")
+                import time as _time
+                # Measure how long we were in the overlap state (proxy for speech duration)
+                entry_time = _overlap_entry_time[0]
+                speech_duration_s = (
+                    _time.monotonic() - entry_time if entry_time is not None else 999.0
+                )
+                _overlap_entry_time[0] = None
+
+                if speech_duration_s < _MIN_BARGE_IN_DURATION_S:
+                    # Brief activation: almost certainly TTS echo.
+                    # Restore SPEAKING state so TTS can continue uninterrupted.
+                    logger.info(
+                        f"Echo suppressed: speech lasted {speech_duration_s:.2f}s "
+                        f"(< {_MIN_BARGE_IN_DURATION_S}s threshold), restoring SPEAKING"
+                    )
+                    await state_machine.transition_to(
+                        ConversationState.SPEAKING,
+                        metadata={"trigger": "echo_suppression_restore"}
+                    )
+                else:
+                    # Sustained speech: real user barge-in — execute immediately
+                    logger.info(
+                        f"Barge-in: speech lasted {speech_duration_s:.2f}s "
+                        f"(>= {_MIN_BARGE_IN_DURATION_S}s), executing"
+                    )
+                    await state_machine.barge_in()  # Cancels LLM+TTS, transitions to LISTENING
+                    await state_machine.start_processing()
+                    logger.info("Barge-in complete: SPEAKING_AND_LISTENING -> PROCESSING")
 
             elif current_state in (ConversationState.LISTENING,):
                 await state_machine.start_processing()
@@ -453,10 +642,21 @@ async def create_pipeline(config: Config) -> Pipeline:
     async def on_llm_complete(result) -> None:
         """Flush TTS buffer and wait for audio to finish before transitioning state.
 
-        Handles barge-in: if state has already changed (e.g., barge-in occurred
-        mid-response), skip the audio drain loop to avoid spurious state transitions.
+        Handles barge-in: if the generation was cancelled (barge-in), skip the
+        audio drain to avoid interfering with the next request's state.
         """
         logger.info(f"LLM completed: {len(result.text)} chars, {result.tokens_generated} tokens")
+
+        # Update Whisper prompt context with recent LLM output for better STT accuracy
+        stt_processor.transcriber.set_prompt_context(result.text)
+
+        # Skip stale completions from cancelled generations (barge-in)
+        # The _cancelled flag is True when barge-in interrupted this generation,
+        # and hasn't been reset yet by a new generate_stream() call.
+        if generator._cancelled:
+            logger.info("LLM complete (cancelled generation), skipping audio drain")
+            tts_processor.reset_audio_tracking()
+            return
 
         # If barge-in occurred, skip the wait-for-audio sequence
         # The state machine is already in LISTENING or PROCESSING from barge-in
@@ -475,36 +675,26 @@ async def create_pipeline(config: Config) -> Pipeline:
             await asyncio.sleep(0.1)
             elapsed += 0.1
 
-        # Now wait for audio to actually play out
-        # The audio is buffered in tracks - wait for buffer to drain
-        # Use a combination of checking track buffers and a timeout based on audio duration
-        audio_duration_s = tts_processor.total_audio_duration_ms / 1000.0
+        # Wait for audio buffer to drain.
+        # With backpressure in on_tts_audio, audio is pushed at playback rate,
+        # so after synthesis completes, only the remaining buffer needs to drain.
+        # Use buffer polling (reliable now that backpressure prevents overflow).
         logger.info(f"TTS generated {tts_processor.total_audio_duration_ms:.0f}ms of audio, waiting for playback")
 
-        # Wait for track buffers to drain
-        max_wait_seconds = max(audio_duration_s + 5.0, 30.0)  # At least audio duration + buffer
-        check_interval = 0.2
-        elapsed = 0.0
-
-        while elapsed < max_wait_seconds:
+        max_drain_wait = 15.0  # Buffer can hold max 10s, so 15s is generous
+        drain_elapsed = 0.0
+        while drain_elapsed < max_drain_wait:
             has_audio = False
             for pc in list(connection_manager._connections):
                 track = connection_manager.get_track(pc)
                 if track is not None and track.has_audio:
                     has_audio = True
-                    buffer_ms = track.buffer_duration_ms
-                    logger.debug(f"Track buffer: {buffer_ms:.0f}ms remaining")
                     break
-
             if not has_audio:
-                logger.info("Audio buffers drained, transitioning to IDLE")
                 break
-
-            await asyncio.sleep(check_interval)
-            elapsed += check_interval
-
-        if elapsed >= max_wait_seconds:
-            logger.warning(f"Timeout ({max_wait_seconds:.1f}s) waiting for audio to drain")
+            await asyncio.sleep(0.05)
+            drain_elapsed += 0.05
+        logger.info("Audio playback wait complete, transitioning to IDLE")
 
         # Reset audio tracking for next utterance
         tts_processor.reset_audio_tracking()
@@ -572,6 +762,21 @@ async def create_pipeline(config: Config) -> Pipeline:
         for pc in connections:
             track = connection_manager.get_track(pc)
             if track is not None:
+                # Backpressure: wait for buffer to drain below 80% capacity
+                # before pushing more audio. Without this, long responses
+                # overflow the 10s buffer and audio gets dropped/truncated.
+                max_wait = 30.0
+                waited = 0.0
+                while track.buffer_duration_ms > 8000:  # 8s threshold (max is 10s)
+                    await asyncio.sleep(0.05)
+                    waited += 0.05
+                    if waited >= max_wait:
+                        logger.warning("Backpressure timeout, pushing anyway")
+                        break
+                    # Abort if cancelled (barge-in)
+                    if state_machine.state not in (ConversationState.PROCESSING, ConversationState.SPEAKING, ConversationState.SPEAKING_AND_LISTENING):
+                        logger.debug("Backpressure aborted: state changed")
+                        return
                 track.push_audio(samples, sample_rate)
             else:
                 logger.warning(f"No track found for connection {pc}")
@@ -587,11 +792,20 @@ async def create_pipeline(config: Config) -> Pipeline:
                 # SPEAKING_AND_LISTENING: reset needed for post-barge-in response (Pitfall 2 + Pattern 6)
                 tts_processor.reset_cancellation()
 
-        # Always reset _first_audio_sent when speech ends (entering PROCESSING)
-        # This ensures the next TTS response triggers SPEAKING transition
+        # Reset _first_audio_sent when speech ends — but only if we're entering PROCESSING.
+        # If echo suppression fired (SPEECH_END during brief SPEAKING_AND_LISTENING),
+        # on_vad_for_state already restored state to SPEAKING. In that case we must NOT
+        # reset _first_audio_sent, because TTS is still running and the next audio chunk
+        # must be accepted without re-triggering the PROCESSING → SPEAKING transition.
         if event.type == VADEventType.SPEECH_END:
-            _first_audio_sent[0] = False
-            logger.debug("Reset _first_audio_sent flag for new response")
+            if current_state != ConversationState.SPEAKING:
+                _first_audio_sent[0] = False
+                logger.debug("Reset _first_audio_sent flag for new response")
+            else:
+                logger.debug(
+                    "Skipping _first_audio_sent reset: echo suppression restored SPEAKING, "
+                    "TTS still active"
+                )
 
     vad_processor.add_callback(on_vad_reset_flags)
 
@@ -636,6 +850,11 @@ async def create_pipeline(config: Config) -> Pipeline:
         """Speak text via TTS for plugins.
 
         Feeds text to TTS processor and handles state transitions.
+
+        Wrapped in try/finally to ALWAYS return to IDLE state — even if
+        synthesis throws an exception (OOM, model error, etc.).  Without
+        this, any exception leaves the state machine stuck in PROCESSING
+        forever because the idle-timeout only recovers LISTENING→IDLE.
         """
         logger.info(f"Plugin speaking: {text[:50]}...")
 
@@ -652,45 +871,51 @@ async def create_pipeline(config: Config) -> Pipeline:
         tts_processor.clear_buffer()
         _first_audio_sent[0] = False
 
-        # Feed text to TTS (it will synthesize on sentence boundaries)
-        for char in text:
-            await tts_processor.receive_token(char)
+        try:
+            # Feed text to TTS (it will synthesize on sentence boundaries)
+            for char in text:
+                await tts_processor.receive_token(char)
 
-        # Flush remaining text
-        await tts_processor.flush()
+            # Flush remaining text
+            await tts_processor.flush()
 
-        # Wait for synthesis to complete
-        max_wait = 30.0
-        elapsed = 0.0
-        while tts_processor.is_synthesizing and elapsed < max_wait:
-            await asyncio.sleep(0.1)
-            elapsed += 0.1
+            # Wait for synthesis to complete
+            max_wait = 30.0
+            elapsed = 0.0
+            while tts_processor.is_synthesizing and elapsed < max_wait:
+                await asyncio.sleep(0.1)
+                elapsed += 0.1
 
-        # Wait for audio to play out
-        audio_duration_s = tts_processor.total_audio_duration_ms / 1000.0
-        max_wait_seconds = max(audio_duration_s + 2.0, 10.0)
-        check_interval = 0.2
-        elapsed = 0.0
+            # Wait for audio to play out
+            audio_duration_s = tts_processor.total_audio_duration_ms / 1000.0
+            max_wait_seconds = max(audio_duration_s + 2.0, 10.0)
+            check_interval = 0.2
+            elapsed = 0.0
 
-        while elapsed < max_wait_seconds:
-            has_audio = False
-            for pc in list(connection_manager._connections):
-                track = connection_manager.get_track(pc)
-                if track is not None and track.has_audio:
-                    has_audio = True
+            while elapsed < max_wait_seconds:
+                has_audio = False
+                for pc in list(connection_manager._connections):
+                    track = connection_manager.get_track(pc)
+                    if track is not None and track.has_audio:
+                        has_audio = True
+                        break
+
+                if not has_audio:
                     break
 
-            if not has_audio:
-                break
+                await asyncio.sleep(check_interval)
+                elapsed += check_interval
 
-            await asyncio.sleep(check_interval)
-            elapsed += check_interval
-
-        # Reset for next utterance
-        tts_processor.reset_audio_tracking()
-
-        # Return to IDLE state
-        await state_machine.stop()
+        except Exception as e:
+            logger.error(f"plugin_speak_callback: synthesis error: {e}", exc_info=True)
+            # Cancel any in-progress synthesis so it doesn't leak resources
+            await tts_processor.cancel()
+        finally:
+            # Always reset TTS state and return state machine to IDLE.
+            # This is critical: without it, any exception leaves state=PROCESSING
+            # with no automatic recovery (idle timeout only handles LISTENING→IDLE).
+            tts_processor.reset_audio_tracking()
+            await state_machine.stop()
 
     # Attach plugins to Ergos components
     plugin_manager.attach_all(
@@ -711,8 +936,27 @@ async def create_pipeline(config: Config) -> Pipeline:
         """
         text = result.text
         logger.info(f"Transcription: {text}")
+        await data_handler.broadcast_transcription(text)
 
-        # === TARS sarcasm command intercept (before plugins and LLM) ===
+        # === Wake word gate (before everything else) ===
+        wake_word = config.persona.wake_word
+        if wake_word:
+            text_lower = text.lower()
+            # Sarcasm commands bypass wake word (system commands always work)
+            is_sarcasm_cmd = try_sarcasm_command(text) is not None
+            if not is_sarcasm_cmd and wake_word.lower() not in text_lower:
+                logger.debug(f"Wake word '{wake_word}' not found, ignoring: {text[:50]}")
+                await state_machine.stop()  # Return to IDLE — without this, state stays PROCESSING
+                return
+            # Strip wake word from text so LLM doesn't see it
+            if not is_sarcasm_cmd:
+                import re as _re
+                text = _re.sub(r'(?i)\b' + _re.escape(wake_word) + r'\b[,.]?\s*', '', text).strip()
+                if not text:
+                    await state_machine.stop()  # Just the wake word, nothing to process
+                    return
+
+        # === Ergos sarcasm command intercept (before plugins and LLM) ===
         if prompt_builder is not None:
             new_level = try_sarcasm_command(text)
             if new_level is not None:
@@ -760,7 +1004,75 @@ async def create_pipeline(config: Config) -> Pipeline:
                 # Deactivate plugin on error
                 await plugin_manager.deactivate_current()
 
+        # Agentic tool execution (if tools available)
+        if tool_processor is not None and tool_processor.has_tools:
+            tts_processor.reset_cancellation()
+            _first_audio_sent[0] = False
+
+            async def agentic_speak(text: str) -> None:
+                """Speak narration phrase during agentic execution."""
+                await plugin_speak_callback(text)
+
+            response_text = await tool_processor.process(
+                user_text=text,
+                speak=agentic_speak,
+                llm_processor=llm_processor,
+            )
+
+            # Stream the final response through TTS
+            if response_text:
+                # CRITICAL: Transition state to PROCESSING before streaming TTS.
+                # After narration phases, plugin_speak_callback returns state to IDLE.
+                # on_tts_audio needs PROCESSING state to transition to SPEAKING on
+                # first audio chunk. Without this, client shows IDLE during playback.
+                # This mirrors the non-agentic path where PROCESSING is set by
+                # on_vad_for_state before LLM generates tokens.
+                current_state = state_machine.state
+                if current_state == ConversationState.IDLE:
+                    await state_machine.start_listening()
+                    await state_machine.start_processing()
+                elif current_state == ConversationState.LISTENING:
+                    await state_machine.start_processing()
+                # If already PROCESSING (e.g., no narration was spoken), no transition needed
+
+                tts_processor.reset_cancellation()
+                _first_audio_sent[0] = False
+                for char in response_text:
+                    await tts_processor.receive_token(char)
+                await tts_processor.flush()
+
+                # Wait for synthesis + audio drain (same pattern as on_llm_complete)
+                max_wait = 30.0
+                elapsed = 0.0
+                while tts_processor.is_synthesizing and elapsed < max_wait:
+                    await asyncio.sleep(0.1)
+                    elapsed += 0.1
+
+                # Wait for audio buffer drain
+                max_drain = 15.0
+                drain_elapsed = 0.0
+                while drain_elapsed < max_drain:
+                    has_audio = False
+                    for pc in list(connection_manager._connections):
+                        track = connection_manager.get_track(pc)
+                        if track is not None and track.has_audio:
+                            has_audio = True
+                            break
+                    if not has_audio:
+                        break
+                    await asyncio.sleep(0.2)
+                    drain_elapsed += 0.2
+
+                tts_processor.reset_audio_tracking()
+                await state_machine.stop()
+            return
+
         # No plugin handled it, pass to LLM
+        # Reset TTS cancellation flag before new generation — barge-in sets
+        # _cancelled=True but there's no SPEECH_START between barge-in and
+        # the new transcription to reset it.
+        tts_processor.reset_cancellation()
+        _first_audio_sent[0] = False
         await llm_processor.process_transcription(result)
 
     # Replace the direct LLM callback with plugin-aware routing
@@ -768,6 +1080,18 @@ async def create_pipeline(config: Config) -> Pipeline:
     stt_processor.remove_transcription_callback(llm_processor.process_transcription)
     stt_processor.add_transcription_callback(on_transcription_with_plugins)
     logger.debug("Wired: STT -> Plugin router -> LLM processor")
+
+    # When STT filters out a transcription (low confidence, hallucination, empty),
+    # no transcription callback fires, leaving state stuck in PROCESSING.
+    # Wire a no-result callback to return to IDLE.
+    async def on_stt_no_result() -> None:
+        current = state_machine.state
+        if current == ConversationState.PROCESSING:
+            logger.debug("STT produced no result, returning to IDLE")
+            await state_machine.stop()
+
+    stt_processor.add_no_result_callback(on_stt_no_result)
+    logger.debug("Wired: STT no-result -> state IDLE")
 
     # Create text input handler for direct text commands (e.g., mode switching)
     async def on_text_input(text: str) -> None:
@@ -847,12 +1171,26 @@ async def create_pipeline(config: Config) -> Pipeline:
         # Feed to STT processor
         await stt_processor.on_audio_chunk(chunk)
 
+    # Reset pipeline state on new connection (fixes stuck state after reconnect)
+    async def on_new_connection() -> None:
+        """Reset pipeline state when a new client connects.
+
+        Performs a full reset of all pipeline flags to prevent stale state
+        from a previous session bleeding into the new one. Critically,
+        this includes _inside_think which causes 0ms TTS if stuck True.
+        """
+        logger.info("New connection: resetting pipeline state")
+        await state_machine.reset()
+        tts_processor.reset_state()  # Clears _cancelled, _inside_think, buffer, audio tracking
+        _first_audio_sent[0] = False
+
     # Create signaling app with all handlers
     app = create_signaling_app(
         manager=connection_manager,
         data_handler=data_handler,
         on_incoming_audio=on_incoming_audio,
     )
+    app["on_connect"] = on_new_connection
     logger.debug("Created signaling app")
 
     # ========== Memory extraction on disconnect ==========
@@ -860,7 +1198,7 @@ async def create_pipeline(config: Config) -> Pipeline:
     # polluting LLM conversation history (anti-pattern: never use llm_processor here)
     async def _extract_and_save_memories() -> None:
         """Extract memories from conversation history and save to disk."""
-        if llm_processor is None or not persona.is_tars_persona:
+        if llm_processor is None or not persona.is_ergos_persona:
             return
 
         history_text = format_history_for_extraction(llm_processor.history)

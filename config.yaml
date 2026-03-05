@@ -2,9 +2,13 @@ llm:
   chat_format: chatml
   context_length: 4096
   device: auto
-  max_tokens: 256
+  max_tokens: 512
   model_path: ~/.ergos/models/Qwen3-8B-Q4_K_M.gguf
   n_gpu_layers: -1
+tools:
+  enabled: true
+  tools_dir: "~/.ergos/tools"
+  max_steps: 8
 persona:
   name: Ergos
   persona_file: null
@@ -15,9 +19,9 @@ server:
 stt:
   compute_type: int8
   device: auto
-  model: small.en
+  model: medium.en
 tts:
-  engine: kokoro
+  engine: orpheus
   device: auto
   speed: 1.0
   voice: af_heart
