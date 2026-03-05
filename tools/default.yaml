@@ -1,0 +1,66 @@
+# Default tool registry for Ergos agentic execution
+#
+# Copy this file to ~/.ergos/tools/default.yaml to enable agentic mode.
+# Add new tools by creating additional .yaml files in that directory.
+# Tools are hot-reloadable via ToolRegistry.reload() without server restart.
+#
+# Shell command security: shell_run enforces allowed_prefixes.
+# Commands not starting with a listed prefix are rejected with an error message.
+# Remove allowed_prefixes entirely to allow any command (use with caution).
+
+tools:
+  - name: file_read
+    description: "Read the contents of a file at the given path"
+    impl: builtin.file_read
+    parameters:
+      type: object
+      properties:
+        path:
+          type: string
+          description: "Absolute or home-relative file path (e.g., ~/notes.txt)"
+      required: [path]
+
+  - name: shell_run
+    description: "Run a shell command and return stdout+stderr. Timeout is 10 seconds."
+    impl: builtin.shell_run
+    allowed_prefixes:
+      - "ls"
+      - "cat"
+      - "head"
+      - "tail"
+      - "wc"
+      - "find"
+      - "grep"
+      - "echo"
+      - "pwd"
+      - "whoami"
+      - "date"
+      - "df"
+      - "du"
+      - "uname"
+      - "python3"
+      - "uv run"
+    parameters:
+      type: object
+      properties:
+        command:
+          type: string
+          description: "Shell command to execute (must start with an allowed prefix)"
+        timeout_seconds:
+          type: integer
+          description: "Max seconds to wait (default 10, max 30)"
+      required: [command]
+
+  - name: file_list
+    description: "List files in a directory matching an optional glob pattern"
+    impl: builtin.file_list
+    parameters:
+      type: object
+      properties:
+        directory:
+          type: string
+          description: "Directory to list (supports ~ expansion)"
+        pattern:
+          type: string
+          description: "Optional glob pattern, e.g. '*.py'. Default is '*' (all files)."
+      required: [directory]
