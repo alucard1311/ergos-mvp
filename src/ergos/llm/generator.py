@@ -215,7 +215,6 @@ class LLMGenerator:
     def create_chat_completion_sync(
         self,
         messages: list[dict],
-        tools: list[dict] | None = None,
         max_tokens: int = 512,
     ) -> dict:
         """Call create_chat_completion with model_lock held. Blocking — run from executor.
@@ -223,9 +222,12 @@ class LLMGenerator:
         Acquires the model lock to prevent concurrent model access (llama_cpp is NOT
         thread-safe — concurrent sampling causes segfaults).
 
+        Tool definitions are injected into the system prompt by ToolCallProcessor
+        using Qwen3's native format. We don't pass tools/tool_choice here because
+        llama-cpp-python's chatml handler ignores them.
+
         Args:
             messages: List of message dicts in chat format.
-            tools: Optional list of ChatCompletionTool dicts for tool-calling.
             max_tokens: Maximum tokens to generate (default 512).
 
         Returns:
@@ -235,8 +237,6 @@ class LLMGenerator:
         with self._model_lock:
             return model.create_chat_completion(
                 messages=messages,
-                tools=tools or [],
-                tool_choice="auto" if tools else "none",
                 max_tokens=max_tokens,
                 temperature=0.2,
                 stop=["<|im_end|>", "<|endoftext|>"],

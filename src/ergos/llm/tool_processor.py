@@ -1,10 +1,12 @@
 """ToolCallProcessor: agentic loop with concurrent narration + tool execution.
 
-Bridges LLM tool-calling (create_chat_completion), voice narration, and multi-step
-chaining into a single processor that pipeline.py can wire.
+Bridges LLM tool-calling, voice narration, and multi-step chaining into a single
+processor that pipeline.py can wire.
 
 Key design decisions (see RESEARCH.md):
-- Pitfall 2: Tool result messages use role='tool' with tool_call_id (not role='user')
+- Qwen3 native tool calling: tools injected into system prompt as <tools> block,
+  responses parsed from <tool_call> tags (llama-cpp-python's chatml format doesn't
+  handle structured tool calling)
 - Pitfall 3: Model lock held during create_chat_completion (no segfaults)
 - Pitfall 6: Narration + execution run concurrently via asyncio.gather (no audible pause)
 - Pitfall 7: Tool messages are ephemeral — only user+assistant go to LLM history
@@ -14,6 +16,7 @@ Key design decisions (see RESEARCH.md):
 import asyncio
 import json
 import logging
+import re
 from typing import TYPE_CHECKING, Callable
 
 from .generator import LLMGenerator
@@ -24,6 +27,9 @@ if TYPE_CHECKING:
     from ergos.tools.registry import ToolRegistry
 
 logger = logging.getLogger(__name__)
+
+# Regex to extract <tool_call>...</tool_call> blocks from Qwen3 responses
+_TOOL_CALL_RE = re.compile(r"<tool_call>\s*(\{.*?\})\s*</tool_call>", re.DOTALL)
 
 # Map of tool name -> narration string spoken while tool executes
 _TOOL_NARRATIONS: dict[str, str] = {
@@ -70,6 +76,51 @@ class ToolCallProcessor:
         """True if any tools are registered."""
         return self._registry.has_tools
 
+    def _format_tools_for_prompt(self) -> str:
+        """Format tool definitions in Qwen3's native <tools> XML format.
+
+        llama-cpp-python's chatml chat format doesn't inject tools into the prompt,
+        so we do it manually using the format Qwen3 was trained on.
+
+        Returns:
+            Tool definitions string to append to system prompt.
+        """
+        tools = self._registry.get_tools()
+        if not tools:
+            return ""
+
+        tool_defs = "\n".join(json.dumps(t, separators=(",", ":")) for t in tools)
+        return (
+            "\n\n# Tools\n\n"
+            "You are provided with function signatures within <tools></tools> XML tags:\n"
+            f"<tools>\n{tool_defs}\n</tools>\n\n"
+            "For each function call, return a JSON object with function name and arguments "
+            "within <tool_call></tool_call> XML tags:\n"
+            "<tool_call>\n"
+            '{"name": "<function-name>", "arguments": <args-json-object>}\n'
+            "</tool_call>"
+        )
+
+    def _parse_tool_calls(self, content: str) -> list[dict]:
+        """Parse <tool_call> blocks from Qwen3 response content.
+
+        Args:
+            content: Raw response content from the model.
+
+        Returns:
+            List of parsed tool call dicts with 'name' and 'arguments' keys.
+            Empty list if no tool calls found.
+        """
+        results = []
+        for match in _TOOL_CALL_RE.finditer(content):
+            try:
+                tc = json.loads(match.group(1))
+                if "name" in tc:
+                    results.append(tc)
+            except json.JSONDecodeError as e:
+                logger.warning("Failed to parse tool_call JSON: %s", e)
+        return results
+
     def _narration_before(self, tool_name: str) -> str:
         """Return spoken narration for a tool call (before execution).
 
@@ -104,9 +155,12 @@ class ToolCallProcessor:
         Returns:
             Final assistant response text.
         """
-        # Build initial messages list: system + conversation history + new user message
+        # Build initial messages list: system (with tools) + conversation history + user
+        # Inject tool definitions into system prompt using Qwen3's native format
+        # (llama-cpp-python's chatml format doesn't handle structured tool calling)
+        system_content = self._system_prompt + self._format_tools_for_prompt()
         messages: list[dict] = [
-            {"role": "system", "content": self._system_prompt}
+            {"role": "system", "content": system_content}
         ]
 
         # Add conversation history from llm_processor
@@ -118,46 +172,44 @@ class ToolCallProcessor:
         user_message = {"role": "user", "content": f"{user_text} /no_think"}
         messages.append(user_message)
 
-        tools = self._registry.get_tools()
         loop = asyncio.get_event_loop()
         final_text = f"Reached step limit of {self._max_steps} steps without a final response."
 
         for step in range(self._max_steps):
             # create_chat_completion_sync is blocking — run in thread executor
+            # Don't pass tools/tool_choice — chatml ignores them; we use native format
             response = await loop.run_in_executor(
                 None,
-                lambda msgs=messages, t=tools: self._generator.create_chat_completion_sync(
+                lambda msgs=messages: self._generator.create_chat_completion_sync(
                     messages=msgs,
-                    tools=t,
                     max_tokens=512,
                 ),
             )
 
             choice = response["choices"][0]
-            finish_reason = choice["finish_reason"]
             message = choice["message"]
+            content = message.get("content") or ""
 
-            if finish_reason != "tool_calls":
-                # Model returned plain text — we're done
-                final_text = message.get("content") or ""
+            # Parse Qwen3 native <tool_call> blocks from response content
+            parsed_tool_calls = self._parse_tool_calls(content)
+
+            if not parsed_tool_calls:
+                # No tool calls — plain text response, we're done
+                final_text = content
                 break
 
-            # Model wants to call tools
-            tool_calls = message.get("tool_calls") or []
+            logger.info("Step %d: %d tool call(s) detected", step + 1, len(parsed_tool_calls))
 
-            # Append the assistant's tool_calls message to local messages (ephemeral)
-            messages.append({
-                "role": "assistant",
-                "content": message.get("content"),
-                "tool_calls": tool_calls,
-            })
+            # Append the assistant's message to local messages (ephemeral)
+            messages.append({"role": "assistant", "content": content})
 
             # Process each tool call: narrate + execute concurrently (Pitfall 6)
-            for tc in tool_calls:
-                fn = tc["function"]
-                tool_name = fn["name"]
-                args = json.loads(fn["arguments"])
-                tool_call_id = tc["id"]
+            tool_results = []
+            for tc in parsed_tool_calls:
+                tool_name = tc["name"]
+                args = tc.get("arguments", {})
+                if isinstance(args, str):
+                    args = json.loads(args)
 
                 narration = self._narration_before(tool_name)
 
@@ -171,20 +223,22 @@ class ToolCallProcessor:
                 # Speak completion AFTER both narration and execution finish
                 await speak("Done.")
 
-                logger.debug(
+                logger.info(
                     "Tool '%s' result (step %d): %s",
                     tool_name,
                     step + 1,
                     result_str[:100] if len(result_str) > 100 else result_str,
                 )
 
-                # Append tool result to local messages (ephemeral — not in history)
-                # Use role='tool' with tool_call_id (Pitfall 2: not role='user')
-                messages.append({
-                    "role": "tool",
-                    "tool_call_id": tool_call_id,
-                    "content": result_str,
-                })
+                tool_results.append({"name": tool_name, "result": result_str})
+
+            # Append tool results as user message with clear formatting
+            # (Qwen3 native format: tool results go in a user turn, not role=tool)
+            results_text = "\n".join(
+                f"<tool_response>\n{json.dumps({'name': r['name'], 'content': r['result']})}\n</tool_response>"
+                for r in tool_results
+            )
+            messages.append({"role": "user", "content": results_text})
 
         # History isolation (Pitfall 7): only user + final assistant go to _history
         # This ensures tool messages never pollute conversation history
