@@ -38,18 +38,12 @@ created: 2026-03-05
 
 | Task ID | Plan | Wave | Requirement | Test Type | Automated Command | File Exists | Status |
 |---------|------|------|-------------|-----------|-------------------|-------------|--------|
-| 17-01-01 | 01 | 0 | AGENT-04 | unit | `uv run pytest tests/unit/test_tool_registry.py -x -q` | ❌ W0 | ⬜ pending |
-| 17-01-02 | 01 | 0 | AGENT-01 | unit | `uv run pytest tests/unit/test_tool_executor.py -x -q` | ❌ W0 | ⬜ pending |
-| 17-01-03 | 01 | 0 | AGENT-02, AGENT-03 | unit | `uv run pytest tests/unit/test_tool_processor.py -x -q` | ❌ W0 | ⬜ pending |
-| 17-02-01 | 02 | 1 | AGENT-04 | unit | `uv run pytest tests/unit/test_tool_registry.py::test_yaml_loading -x -q` | ❌ W0 | ⬜ pending |
-| 17-02-02 | 02 | 1 | AGENT-04 | unit | `uv run pytest tests/unit/test_tool_registry.py::test_tool_added_after_reload -x -q` | ❌ W0 | ⬜ pending |
-| 17-03-01 | 03 | 1 | AGENT-01 | unit | `uv run pytest tests/unit/test_tool_executor.py::test_file_read -x -q` | ❌ W0 | ⬜ pending |
-| 17-03-02 | 03 | 1 | AGENT-01 | unit | `uv run pytest tests/unit/test_tool_executor.py::test_shell_run_basic -x -q` | ❌ W0 | ⬜ pending |
-| 17-04-01 | 04 | 2 | AGENT-02 | unit | `uv run pytest tests/unit/test_tool_processor.py::test_narration_before_tool -x -q` | ❌ W0 | ⬜ pending |
-| 17-04-02 | 04 | 2 | AGENT-02 | unit | `uv run pytest tests/unit/test_tool_processor.py::test_narration_after_tool -x -q` | ❌ W0 | ⬜ pending |
-| 17-04-03 | 04 | 2 | AGENT-03 | unit | `uv run pytest tests/unit/test_tool_processor.py::test_multi_step_chain -x -q` | ❌ W0 | ⬜ pending |
-| 17-04-04 | 04 | 2 | AGENT-03 | unit | `uv run pytest tests/unit/test_tool_processor.py::test_max_steps_limit -x -q` | ❌ W0 | ⬜ pending |
-| 17-05-01 | 05 | 3 | AGENT-01..04 | integration | `uv run pytest tests/unit/test_tool_processor.py -x -q` | ❌ W0 | ⬜ pending |
+| 17-01-T1 | 01 | 1 | AGENT-04 | unit | `uv run pytest tests/unit/test_tool_registry.py -x -q` | ❌ W0 | ⬜ pending |
+| 17-01-T2 | 01 | 1 | AGENT-01 | unit | `uv run pytest tests/unit/test_tool_executor.py -x -q` | ❌ W0 | ⬜ pending |
+| 17-02-T1 | 02 | 2 | AGENT-01, AGENT-02, AGENT-03 | unit | `uv run pytest tests/unit/test_tool_processor.py -x -q` | ❌ W0 | ⬜ pending |
+| 17-02-T2 | 02 | 2 | AGENT-02, AGENT-03 | unit | `uv run pytest tests/unit/test_tool_processor.py -x -q -v` | ❌ W0 | ⬜ pending |
+| 17-03-T1 | 03 | 3 | AGENT-01..04 | integration | `uv run pytest tests/unit/ -x -q` | ❌ W0 | ⬜ pending |
+| 17-03-T2 | 03 | 3 | AGENT-01..04 | manual | Human verification checkpoint | N/A | ⬜ pending |
 
 *Status: ⬜ pending · ✅ green · ❌ red · ⚠️ flaky*
 
